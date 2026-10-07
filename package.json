@@ -8,9 +8,10 @@
   "scripts": {
     "dev": "tsx watch --env-file=.env src/main.ts",
     "build": "tsc",
-    "start": "node dist/main.js",
+    "start": "node dist/db/migrate.js && node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "tsx --env-file=.env src/db/migrate.ts"
+    "db:migrate": "tsx --env-file=.env src/db/migrate.ts",
+    "demo": "tsx --env-file=.env src/demo/run.ts"
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -23,5 +24,6 @@
     "@types/pg": "^8.23.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
-  }
+  },
+  "packageManager": "pnpm@12.9.1"
 }

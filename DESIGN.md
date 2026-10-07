@@ -301,7 +301,8 @@ Headline line: **duplicates received > 0, processed twice = 0.** That's "exactly
 
 ## 9. Build Plan
 
-Stack: TypeScript · pnpm · Express 5 · `pg` · Neon (Postgres) · Railway. Tests: built-in `node:test` via `tsx --test`.
+Stack: TypeScript · pnpm · Express 5 · `pg` · zod · Neon (Postgres) · Railway. No automated tests yet (deferred); each step was checked by running it against Neon.
+Code layout: plain Express routes + controllers; services follow SOLID and depend on repository/collaborator interfaces; `container.ts` wires everything.
 Deploy shape: one Node process running `api` + `worker` modules; worker sleeps when nothing is pending and is woken through a `WorkSignal` interface (in-memory today, LISTEN/NOTIFY or polling if split later). Lets Neon scale to zero (free tier: 100 CU-hours/month).
 
 | Step | Scope | Done when |
@@ -309,10 +310,10 @@ Deploy shape: one Node process running `api` + `worker` modules; worker sleeps w
 | S0 ✅ | Scaffold: pnpm, TS, Express, `/health`, test runner | `pnpm dev` → `/health` ok; test passes |
 | S1 ✅ | Schema SQL + migrate script | Tables exist in Neon |
 | S2 ✅ | `/endpoints` CRUD + secret generation | Register returns a secret |
-| S3 | `POST /events`: idempotency + fan-out in one txn | Same key twice → one event |
-| S4 | Worker: lease → sign → send → record → backoff/dead, sleep/wake | Test receiver gets signed requests |
-| S5 | Circuit breaker | Killed receiver gets paused |
-| S6 | `/deliveries` + replay | Dead delivery replays |
-| S7 | Dashboard (static HTML) + **"Try it" form**: paste a URL (e.g. webhook.site) → `POST /demo/test-event` → signed webhook arrives | Browse + replay; a visitor receives a signed test event |
-| S8 | Fake flaky receivers + load script + checker | Demo numbers |
-| S9 | Deploy to Railway: API key on non-demo routes, https-only + private-IP block on receiver URLs, rate limit on `/demo/*` | Public URL; demo form safe to expose |
+| S3 ✅ | `POST /events`: idempotency + fan-out in one txn | Same key twice → one event |
+| S4 ✅ | Worker: lease → sign → send → record → backoff/dead, sleep/wake | Test receiver gets signed requests |
+| S5 ✅ | Circuit breaker | Killed receiver gets paused |
+| S6 ✅ | `/deliveries` + replay | Dead delivery replays |
+| S7 ✅ | Dashboard (static HTML) + **"Try it" form**: paste a URL (e.g. webhook.site) → `POST /demo/test-event` → signed webhook arrives | Browse + replay; a visitor receives a signed test event |
+| S8 ✅ | Fake flaky receivers + load script + checker | Demo numbers |
+| S9 🟡 code ready, deploy pending | Deploy to Railway: API key on non-demo routes, https-only + private-IP block on receiver URLs, rate limit on `/demo/*` | Public URL; demo form safe to expose |
