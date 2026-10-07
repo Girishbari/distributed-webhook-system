@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
-import type { Endpoint, EndpointChanges } from "./Endpoint";
-import type { EndpointRepository } from "./EndpointRepository";
+import type { Endpoint, EndpointChanges } from "../types/endpoint";
+import type { EndpointHealthRepository, EndpointRepository } from "./interfaces";
 
 type EndpointRow = {
   id: string;
@@ -22,7 +22,7 @@ function toEndpoint(row: EndpointRow): Endpoint {
   };
 }
 
-export class PostgresEndpointRepository implements EndpointRepository {
+export class PostgresEndpointRepository implements EndpointRepository, EndpointHealthRepository {
   constructor(private readonly pool: Pool) {}
 
   async insert(endpoint: Endpoint): Promise<void> {
@@ -38,6 +38,14 @@ export class PostgresEndpointRepository implements EndpointRepository {
       "SELECT * FROM endpoints ORDER BY created_at DESC",
     );
     return rows.map(toEndpoint);
+  }
+
+  async findByUrlAndEventType(url: string, eventType: string): Promise<Endpoint | undefined> {
+    const { rows } = await this.pool.query<EndpointRow>(
+      "SELECT * FROM endpoints WHERE url = $1 AND $2 = ANY(event_types) LIMIT 1",
+      [url, eventType],
+    );
+    return rows[0] && toEndpoint(rows[0]);
   }
 
   async update(id: string, changes: EndpointChanges): Promise<Endpoint | undefined> {
@@ -56,5 +64,26 @@ export class PostgresEndpointRepository implements EndpointRepository {
   async delete(id: string): Promise<boolean> {
     const { rowCount } = await this.pool.query("DELETE FROM endpoints WHERE id = $1", [id]);
     return rowCount === 1;
+  }
+
+  async recordSuccess(endpointId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE endpoints SET consecutive_failures = 0, paused_until = NULL
+       WHERE id = $1 AND consecutive_failures > 0`,
+      [endpointId],
+    );
+  }
+
+  async recordFailure(endpointId: string, failureThreshold: number, pauseMs: number): Promise<void> {
+    await this.pool.query(
+      `UPDATE endpoints SET
+         consecutive_failures = consecutive_failures + 1,
+         paused_until = CASE
+           WHEN consecutive_failures + 1 >= $2 THEN now() + $3::int * interval '1 millisecond'
+           ELSE paused_until
+         END
+       WHERE id = $1`,
+      [endpointId, failureThreshold, pauseMs],
+    );
   }
 }

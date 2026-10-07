@@ -1,14 +1,18 @@
-import { createApp } from "./api/createApp";
-import { loadConfig } from "./config";
-import { createPool } from "./db/createPool";
-import { EndpointService } from "./endpoints/EndpointService";
-import { PostgresEndpointRepository } from "./endpoints/PostgresEndpointRepository";
+import app from "./app";
+import { config, deliveryWorker, pool } from "./container";
 
-const config = loadConfig();
-const pool = createPool(config.databaseUrl);
-
-const endpointService = new EndpointService(new PostgresEndpointRepository(pool));
-
-createApp({ endpointService }).listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`api listening on http://localhost:${config.port}`);
 });
+deliveryWorker.start();
+
+async function shutdown() {
+  console.log("shutting down");
+  server.close();
+  await deliveryWorker.stop();
+  await pool.end();
+  process.exit(0);
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);

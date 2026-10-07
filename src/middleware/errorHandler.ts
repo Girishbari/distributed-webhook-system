@@ -1,5 +1,5 @@
 import type { ErrorRequestHandler } from "express";
-import { BadRequestError } from "./validate";
+import { BadRequestError } from "../shared/errors";
 
 export const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
   if (error instanceof BadRequestError) {

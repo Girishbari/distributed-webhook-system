@@ -17,9 +17,3 @@ export type EndpointChanges = {
   eventTypes?: string[];
   enabled?: boolean;
 };
-
-export type PublicEndpoint = Omit<Endpoint, "secret">;
-
-export function hideSecret({ secret, ...endpoint }: Endpoint): PublicEndpoint {
-  return endpoint;
-}

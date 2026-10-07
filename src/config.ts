@@ -1,14 +1,21 @@
 export type Config = {
   port: number;
   databaseUrl: string;
+  apiKey: string;
+  allowPrivateUrls: boolean;
 };
 
-export function loadConfig(): Config {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) throw new Error("DATABASE_URL is not set");
+function required(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is not set`);
+  return value;
+}
 
+export function loadConfig(): Config {
   return {
     port: Number(process.env.PORT ?? 3000),
-    databaseUrl,
+    databaseUrl: required("DATABASE_URL"),
+    apiKey: required("API_KEY"),
+    allowPrivateUrls: process.env.ALLOW_PRIVATE_URLS === "true",
   };
 }

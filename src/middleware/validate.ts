@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-export class BadRequestError extends Error {}
+import { BadRequestError } from "../shared/errors";
 
 export function validate<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
