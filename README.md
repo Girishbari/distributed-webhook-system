@@ -50,16 +50,16 @@ The line to look at is **"re-sent after already processed"** next to **"processe
                                      Receivers
 ```
 
-| Decision | Why |
-|---|---|
-| **Postgres is the queue** (`FOR UPDATE SKIP LOCKED`) | ~1.4k sends/s fits one database; one system to run; event + deliveries saved atomically |
-| **Fan-out inside `POST /events`, one transaction** | There's never an event without its deliveries, even if the process crashes |
-| **`Idempotency-Key` header, enforced by a `UNIQUE` constraint** | A sender retrying after a lost `202` doesn't create duplicates |
-| **Lease via `next_attempt_at`** | Claiming a delivery pushes its due time 30s ahead; if the worker dies, it simply becomes due again |
-| **Backoff 10s → 30s → 90s, ±20% jitter, then dead** | Rides out a one-minute outage; jitter stops retry stampedes |
-| **Circuit breaker: 10 failures in a row → pause 1 min** | Dead receivers stop occupying workers; paused time doesn't use up retries |
-| **Worker sleeps when idle, woken in-memory by the API** | The database can scale to zero (Neon free tier) instead of being polled every second |
-| **No ordering guarantee** | Ordering means head-of-line blocking; receivers dedupe by id and refetch state instead |
+| Decision                                                        | Why                                                                                                |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Postgres is the queue** (`FOR UPDATE SKIP LOCKED`)            | ~1.4k sends/s fits one database; one system to run; event + deliveries saved atomically            |
+| **Fan-out inside `POST /events`, one transaction**              | There's never an event without its deliveries, even if the process crashes                         |
+| **`Idempotency-Key` header, enforced by a `UNIQUE` constraint** | A sender retrying after a lost `202` doesn't create duplicates                                     |
+| **Lease via `next_attempt_at`**                                 | Claiming a delivery pushes its due time 30s ahead; if the worker dies, it simply becomes due again |
+| **Backoff 10s → 30s → 90s, ±20% jitter, then dead**             | Rides out a one-minute outage; jitter stops retry stampedes                                        |
+| **Circuit breaker: 10 failures in a row → pause 1 min**         | Dead receivers stop occupying workers; paused time doesn't use up retries                          |
+| **Worker sleeps when idle, woken in-memory by the API**         | The database can scale to zero (Neon free tier) instead of being polled every second               |
+| **No ordering guarantee**                                       | Ordering means head-of-line blocking; receivers dedupe by id and refetch state instead             |
 
 The full design (requirements, estimates, schema, trade-offs, decision log) is in [DESIGN.md](DESIGN.md).
 
@@ -80,7 +80,10 @@ function isValid(secret: string, timestamp: string, rawBody: string, header: str
   if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
   const expected = createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
   const received = header.replace(/^v1=/, "");
-  return expected.length === received.length && timingSafeEqual(Buffer.from(expected), Buffer.from(received));
+  return (
+    expected.length === received.length &&
+    timingSafeEqual(Buffer.from(expected), Buffer.from(received))
+  );
 }
 ```
 
@@ -88,19 +91,19 @@ function isValid(secret: string, timestamp: string, rawBody: string, header: str
 
 All routes except `/health` and `/demo/*` need `Authorization: Bearer <API_KEY>`.
 
-| Method | Path | |
-|---|---|---|
-| `POST` | `/endpoints` | Register `{ url, eventTypes }` → returns the signing secret once |
-| `GET` | `/endpoints` | List endpoints |
-| `PATCH` | `/endpoints/:id` | Change `url`, `eventTypes`, `enabled` |
-| `DELETE` | `/endpoints/:id` | Remove |
-| `POST` | `/events` | Publish `{ type, payload }` with an `Idempotency-Key` header → `202 { eventId, duplicate }` |
-| `GET` | `/deliveries?status=&endpointId=&limit=` | List deliveries |
-| `GET` | `/deliveries/stats` | Counts by status |
-| `GET` | `/deliveries/:id` | One delivery with all its attempts |
-| `POST` | `/deliveries/:id/replay` | Replay one dead delivery |
-| `POST` | `/deliveries/replay` | Replay all dead, optionally `{ endpointId }` |
-| `POST` | `/demo/test-event` | Public, rate limited: send a signed test event to `{ url }` |
+| Method   | Path                                     |                                                                                             |
+| -------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `POST`   | `/endpoints`                             | Register `{ url, eventTypes }` → returns the signing secret once                            |
+| `GET`    | `/endpoints`                             | List endpoints                                                                              |
+| `PATCH`  | `/endpoints/:id`                         | Change `url`, `eventTypes`, `enabled`                                                       |
+| `DELETE` | `/endpoints/:id`                         | Remove                                                                                      |
+| `POST`   | `/events`                                | Publish `{ type, payload }` with an `Idempotency-Key` header → `202 { eventId, duplicate }` |
+| `GET`    | `/deliveries?status=&endpointId=&limit=` | List deliveries                                                                             |
+| `GET`    | `/deliveries/stats`                      | Counts by status                                                                            |
+| `GET`    | `/deliveries/:id`                        | One delivery with all its attempts                                                          |
+| `POST`   | `/deliveries/:id/replay`                 | Replay one dead delivery                                                                    |
+| `POST`   | `/deliveries/replay`                     | Replay all dead, optionally `{ endpointId }`                                                |
+| `POST`   | `/demo/test-event`                       | Public, rate limited: send a signed test event to `{ url }`                                 |
 
 ## Running locally
 

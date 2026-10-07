@@ -1,257 +1,508 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Webhook Delivery Service</title>
-<style>
-  :root {
-    --bg: #f7f6f2; --panel: #ffffff; --fg: #1d1d1b; --muted: #6b6a64; --line: #e3e1d9;
-    --accent: #3b5bdb; --on-accent: #ffffff; --ok: #237032; --warn: #8a5a00; --bad: #c92a2a; --code: #f1efe8;
-    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #141413; --panel: #1d1d1b; --fg: #ecebe6; --muted: #9a988f; --line: #33322e;
-      --accent: #7c9cff; --on-accent: #10131f; --ok: #69db7c; --warn: #ffd43b; --bad: #ff8787; --code: #262622;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
-  h1 { font-size: 26px; margin: 0 0 4px; }
-  h2 { font-size: 18px; margin: 0 0 4px; }
-  p { margin: 0 0 12px; }
-  .muted { color: var(--muted); }
-  .small { font-size: 13px; }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-top: 20px; }
-  form, .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  input, select, button { font: inherit; border-radius: 6px; border: 1px solid var(--line); padding: 8px 10px; background: var(--bg); color: var(--fg); }
-  input[type=url], input[type=password] { flex: 1 1 280px; min-width: 0; }
-  button { background: var(--accent); color: var(--on-accent); border-color: var(--accent); cursor: pointer; }
-  button.secondary { background: transparent; color: var(--fg); border-color: var(--line); }
-  button:disabled { opacity: .5; cursor: default; }
-  code, pre { font-family: var(--mono); font-size: 12.5px; background: var(--code); border-radius: 4px; }
-  code { padding: 1px 5px; word-break: break-all; }
-  pre { padding: 10px; overflow-x: auto; margin: 8px 0 0; }
-  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid currentColor; }
-  .pending { color: var(--warn); } .delivered { color: var(--ok); } .dead { color: var(--bad); }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
-  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
-  .stat b { display: block; font-size: 22px; }
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-  tbody tr { cursor: pointer; }
-  tbody tr:hover { background: var(--code); }
-  td.url { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
-  .attempts { list-style: none; padding: 0; margin: 8px 0 0; font-family: var(--mono); font-size: 12.5px; }
-  .attempts li { padding: 3px 0; border-bottom: 1px dashed var(--line); }
-  .card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 12px; }
-  .error { color: var(--bad); }
-  .hidden { display: none; }
-  @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
-</style>
-</head>
-<body>
-<main>
-  <h1>Webhook Delivery Service</h1>
-  <p class="muted">Signed webhooks with retries, backoff, a circuit breaker and replay. Like Stripe's webhooks, built from scratch on Node.js and Postgres.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Webhook Delivery Service</title>
+    <style>
+      :root {
+        --bg: #f7f6f2;
+        --panel: #ffffff;
+        --fg: #1d1d1b;
+        --muted: #6b6a64;
+        --line: #e3e1d9;
+        --accent: #3b5bdb;
+        --on-accent: #ffffff;
+        --ok: #237032;
+        --warn: #8a5a00;
+        --bad: #c92a2a;
+        --code: #f1efe8;
+        --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #141413;
+          --panel: #1d1d1b;
+          --fg: #ecebe6;
+          --muted: #9a988f;
+          --line: #33322e;
+          --accent: #7c9cff;
+          --on-accent: #10131f;
+          --ok: #69db7c;
+          --warn: #ffd43b;
+          --bad: #ff8787;
+          --code: #262622;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.5 system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 32px 16px 64px;
+      }
+      h1 {
+        font-size: 26px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 13px;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 20px;
+      }
+      form,
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        padding: 8px 10px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      input[type="url"],
+      input[type="password"] {
+        flex: 1 1 280px;
+        min-width: 0;
+      }
+      button {
+        background: var(--accent);
+        color: var(--on-accent);
+        border-color: var(--accent);
+        cursor: pointer;
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--fg);
+        border-color: var(--line);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      code,
+      pre {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        background: var(--code);
+        border-radius: 4px;
+      }
+      code {
+        padding: 1px 5px;
+        word-break: break-all;
+      }
+      pre {
+        padding: 10px;
+        overflow-x: auto;
+        margin: 8px 0 0;
+      }
+      .pill {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid currentColor;
+      }
+      .pending {
+        color: var(--warn);
+      }
+      .delivered {
+        color: var(--ok);
+      }
+      .dead {
+        color: var(--bad);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin: 16px 0;
+      }
+      .stat {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+      }
+      .stat b {
+        display: block;
+        font-size: 22px;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      tbody tr {
+        cursor: pointer;
+      }
+      tbody tr:hover {
+        background: var(--code);
+      }
+      td.url {
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .attempts {
+        list-style: none;
+        padding: 0;
+        margin: 8px 0 0;
+        font-family: var(--mono);
+        font-size: 12.5px;
+      }
+      .attempts li {
+        padding: 3px 0;
+        border-bottom: 1px dashed var(--line);
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 12px;
+      }
+      .error {
+        color: var(--bad);
+      }
+      .hidden {
+        display: none;
+      }
+      @media (max-width: 560px) {
+        .stats {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Webhook Delivery Service</h1>
+      <p class="muted">
+        Signed webhooks with retries, backoff, a circuit breaker and replay. Like Stripe's webhooks,
+        built from scratch on Node.js and Postgres.
+      </p>
 
-  <section>
-    <h2>Try it</h2>
-    <p class="muted small">Paste a URL that can receive requests, for example a free inbox from <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a>. We'll send it a signed test event. If your inbox can be set to answer with an error (500), do that to watch the retries happen, then switch it back.</p>
-    <form id="try-form">
-      <input id="try-url" type="url" required placeholder="https://webhook.site/your-unique-id">
-      <button id="try-button">Send test event</button>
-    </form>
-    <p id="try-error" class="error small"></p>
-    <div id="try-result" class="card hidden"></div>
-  </section>
+      <section>
+        <h2>Try it</h2>
+        <p class="muted small">
+          Paste a URL that can receive requests, for example a free inbox from
+          <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a>. We'll send
+          it a signed test event. If your inbox can be set to answer with an error (500), do that to
+          watch the retries happen, then switch it back.
+        </p>
+        <form id="try-form">
+          <input
+            id="try-url"
+            type="url"
+            required
+            placeholder="https://webhook.site/your-unique-id"
+          />
+          <button id="try-button">Send test event</button>
+        </form>
+        <p id="try-error" class="error small"></p>
+        <div id="try-result" class="card hidden"></div>
+      </section>
 
-  <section>
-    <h2>Operator console</h2>
-    <p class="muted small">Every delivery, its attempts, and replay. Requires the API key.</p>
-    <form id="key-form">
-      <input id="api-key" type="password" placeholder="API key" autocomplete="off">
-      <button class="secondary">Unlock</button>
-    </form>
-    <p id="console-error" class="error small"></p>
+      <section>
+        <h2>Operator console</h2>
+        <p class="muted small">Every delivery, its attempts, and replay. Requires the API key.</p>
+        <form id="key-form">
+          <input id="api-key" type="password" placeholder="API key" autocomplete="off" />
+          <button class="secondary">Unlock</button>
+        </form>
+        <p id="console-error" class="error small"></p>
 
-    <div id="console" class="hidden">
-      <div class="stats">
-        <div class="stat"><span class="pending">Pending</span><b id="stat-pending">–</b></div>
-        <div class="stat"><span class="delivered">Delivered</span><b id="stat-delivered">–</b></div>
-        <div class="stat"><span class="dead">Dead</span><b id="stat-dead">–</b></div>
-      </div>
-      <div class="row">
-        <select id="status-filter">
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="delivered">Delivered</option>
-          <option value="dead">Dead</option>
-        </select>
-        <button id="replay-all" class="secondary">Replay all dead</button>
-        <span id="replay-message" class="muted small"></span>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>ID</th><th>Event</th><th>Endpoint</th><th>Status</th><th>Attempts</th><th>Next attempt</th></tr></thead>
-          <tbody id="deliveries"></tbody>
-        </table>
-      </div>
-      <div id="details" class="card hidden"></div>
-    </div>
-  </section>
-</main>
+        <div id="console" class="hidden">
+          <div class="stats">
+            <div class="stat"><span class="pending">Pending</span><b id="stat-pending">–</b></div>
+            <div class="stat">
+              <span class="delivered">Delivered</span><b id="stat-delivered">–</b>
+            </div>
+            <div class="stat"><span class="dead">Dead</span><b id="stat-dead">–</b></div>
+          </div>
+          <div class="row">
+            <select id="status-filter">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="delivered">Delivered</option>
+              <option value="dead">Dead</option>
+            </select>
+            <button id="replay-all" class="secondary">Replay all dead</button>
+            <span id="replay-message" class="muted small"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Event</th>
+                  <th>Endpoint</th>
+                  <th>Status</th>
+                  <th>Attempts</th>
+                  <th>Next attempt</th>
+                </tr>
+              </thead>
+              <tbody id="deliveries"></tbody>
+            </table>
+          </div>
+          <div id="details" class="card hidden"></div>
+        </div>
+      </section>
+    </main>
 
-<script>
-  const $ = (id) => document.getElementById(id);
+    <script>
+      const $ = (id) => document.getElementById(id);
 
-  function el(tag, props = {}, ...children) {
-    const node = Object.assign(document.createElement(tag), props);
-    node.append(...children.filter((child) => child !== null && child !== undefined));
-    return node;
-  }
+      function el(tag, props = {}, ...children) {
+        const node = Object.assign(document.createElement(tag), props);
+        node.append(...children.filter((child) => child !== null && child !== undefined));
+        return node;
+      }
 
-  const time = (iso) => new Date(iso).toLocaleTimeString();
-  const pill = (status) => el("span", { className: `pill ${status}`, textContent: status });
+      const time = (iso) => new Date(iso).toLocaleTimeString();
+      const pill = (status) => el("span", { className: `pill ${status}`, textContent: status });
 
-  function attemptList(attempts) {
-    if (attempts.length === 0) return el("p", { className: "muted small", textContent: "No attempts yet." });
-    return el("ol", { className: "attempts" }, ...attempts.map((attempt) =>
-      el("li", { textContent: `${time(attempt.attemptedAt)} → ${attempt.statusCode ?? attempt.error} (${attempt.durationMs} ms)` })));
-  }
+      function attemptList(attempts) {
+        if (attempts.length === 0)
+          return el("p", { className: "muted small", textContent: "No attempts yet." });
+        return el(
+          "ol",
+          { className: "attempts" },
+          ...attempts.map((attempt) =>
+            el("li", {
+              textContent: `${time(attempt.attemptedAt)} → ${attempt.statusCode ?? attempt.error} (${attempt.durationMs} ms)`,
+            }),
+          ),
+        );
+      }
 
-  let tryPoll;
-  $("try-form").addEventListener("submit", async (submit) => {
-    submit.preventDefault();
-    $("try-error").textContent = "";
-    $("try-button").disabled = true;
-    clearInterval(tryPoll);
-    try {
-      const response = await fetch("/demo/test-event", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: $("try-url").value }),
+      let tryPoll;
+      $("try-form").addEventListener("submit", async (submit) => {
+        submit.preventDefault();
+        $("try-error").textContent = "";
+        $("try-button").disabled = true;
+        clearInterval(tryPoll);
+        try {
+          const response = await fetch("/demo/test-event", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url: $("try-url").value }),
+          });
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error);
+          showTryResult(body);
+          tryPoll = setInterval(() => refreshTryResult(body), 2000);
+          refreshTryResult(body);
+        } catch (error) {
+          $("try-error").textContent = error.message;
+        } finally {
+          $("try-button").disabled = false;
+        }
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error);
-      showTryResult(body);
-      tryPoll = setInterval(() => refreshTryResult(body), 2000);
-      refreshTryResult(body);
-    } catch (error) {
-      $("try-error").textContent = error.message;
-    } finally {
-      $("try-button").disabled = false;
-    }
-  });
 
-  function showTryResult({ eventId, secret }) {
-    $("try-result").classList.remove("hidden");
-    $("try-result").replaceChildren(
-      el("p", {}, "Event ", el("code", { textContent: eventId }), " queued."),
-      el("p", { className: "small" }, "Signing secret: ", el("code", { textContent: secret })),
-      el("p", { className: "muted small" },
-        "Check it yourself: HMAC-SHA256 of ", el("code", { textContent: "<x-webhook-timestamp>.<raw body>" }),
-        " with this secret should equal the hex in ", el("code", { textContent: "x-webhook-signature" }), "."),
-      el("div", { id: "try-timeline" }, el("p", { className: "muted small", textContent: "Waiting for the first attempt…" })),
-    );
-  }
+      function showTryResult({ eventId, secret }) {
+        $("try-result").classList.remove("hidden");
+        $("try-result").replaceChildren(
+          el("p", {}, "Event ", el("code", { textContent: eventId }), " queued."),
+          el("p", { className: "small" }, "Signing secret: ", el("code", { textContent: secret })),
+          el(
+            "p",
+            { className: "muted small" },
+            "Check it yourself: HMAC-SHA256 of ",
+            el("code", { textContent: "<x-webhook-timestamp>.<raw body>" }),
+            " with this secret should equal the hex in ",
+            el("code", { textContent: "x-webhook-signature" }),
+            ".",
+          ),
+          el(
+            "div",
+            { id: "try-timeline" },
+            el("p", { className: "muted small", textContent: "Waiting for the first attempt…" }),
+          ),
+        );
+      }
 
-  async function refreshTryResult({ eventId, endpointId }) {
-    const response = await fetch(`/demo/endpoints/${encodeURIComponent(endpointId)}/deliveries`);
-    if (!response.ok) return;
-    const delivery = (await response.json()).find((item) => item.eventId === eventId);
-    if (!delivery) return;
-    $("try-timeline").replaceChildren(
-      el("p", {}, "Status: ", pill(delivery.status),
-        delivery.status === "pending" && delivery.attempts.length > 0 ? ` next try at ${time(delivery.nextAttemptAt)}` : null),
-      attemptList(delivery.attempts),
-    );
-    if (delivery.status !== "pending") clearInterval(tryPoll);
-  }
+      async function refreshTryResult({ eventId, endpointId }) {
+        const response = await fetch(
+          `/demo/endpoints/${encodeURIComponent(endpointId)}/deliveries`,
+        );
+        if (!response.ok) return;
+        const delivery = (await response.json()).find((item) => item.eventId === eventId);
+        if (!delivery) return;
+        $("try-timeline").replaceChildren(
+          el(
+            "p",
+            {},
+            "Status: ",
+            pill(delivery.status),
+            delivery.status === "pending" && delivery.attempts.length > 0
+              ? ` next try at ${time(delivery.nextAttemptAt)}`
+              : null,
+          ),
+          attemptList(delivery.attempts),
+        );
+        if (delivery.status !== "pending") clearInterval(tryPoll);
+      }
 
-  let apiKey = "";
-  try { apiKey = localStorage.getItem("wds-api-key") ?? ""; } catch {}
-  let selectedDeliveryId = null;
+      let apiKey = "";
+      try {
+        apiKey = localStorage.getItem("wds-api-key") ?? "";
+      } catch {}
+      let selectedDeliveryId = null;
 
-  async function api(path, options = {}) {
-    const response = await fetch(path, {
-      ...options,
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-    });
-    if (response.status === 401) throw new Error("That API key was not accepted.");
-    if (!response.ok) throw new Error((await response.json()).error ?? `Request failed (${response.status})`);
-    return response.json();
-  }
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        });
+        if (response.status === 401) throw new Error("That API key was not accepted.");
+        if (!response.ok)
+          throw new Error((await response.json()).error ?? `Request failed (${response.status})`);
+        return response.json();
+      }
 
-  $("key-form").addEventListener("submit", (submit) => {
-    submit.preventDefault();
-    apiKey = $("api-key").value.trim();
-    try { localStorage.setItem("wds-api-key", apiKey); } catch {}
-    refreshConsole();
-  });
+      $("key-form").addEventListener("submit", (submit) => {
+        submit.preventDefault();
+        apiKey = $("api-key").value.trim();
+        try {
+          localStorage.setItem("wds-api-key", apiKey);
+        } catch {}
+        refreshConsole();
+      });
 
-  $("status-filter").addEventListener("change", refreshConsole);
+      $("status-filter").addEventListener("change", refreshConsole);
 
-  $("replay-all").addEventListener("click", async () => {
-    const { replayed } = await api("/deliveries/replay", { method: "POST", body: "{}" });
-    $("replay-message").textContent = `${replayed} dead deliveries queued again.`;
-    refreshConsole();
-  });
+      $("replay-all").addEventListener("click", async () => {
+        const { replayed } = await api("/deliveries/replay", { method: "POST", body: "{}" });
+        $("replay-message").textContent = `${replayed} dead deliveries queued again.`;
+        refreshConsole();
+      });
 
-  async function refreshConsole() {
-    if (!apiKey) return;
-    try {
-      const status = $("status-filter").value;
-      const [stats, deliveries] = await Promise.all([
-        api("/deliveries/stats"),
-        api(`/deliveries?limit=50${status ? `&status=${status}` : ""}`),
-      ]);
-      $("console-error").textContent = "";
-      $("console").classList.remove("hidden");
-      for (const key of ["pending", "delivered", "dead"]) $(`stat-${key}`).textContent = stats[key].toLocaleString();
-      $("deliveries").replaceChildren(...deliveries.map(deliveryRow));
-      if (selectedDeliveryId) showDetails(selectedDeliveryId);
-    } catch (error) {
-      $("console-error").textContent = error.message;
-    }
-  }
+      async function refreshConsole() {
+        if (!apiKey) return;
+        try {
+          const status = $("status-filter").value;
+          const [stats, deliveries] = await Promise.all([
+            api("/deliveries/stats"),
+            api(`/deliveries?limit=50${status ? `&status=${status}` : ""}`),
+          ]);
+          $("console-error").textContent = "";
+          $("console").classList.remove("hidden");
+          for (const key of ["pending", "delivered", "dead"])
+            $(`stat-${key}`).textContent = stats[key].toLocaleString();
+          $("deliveries").replaceChildren(...deliveries.map(deliveryRow));
+          if (selectedDeliveryId) showDetails(selectedDeliveryId);
+        } catch (error) {
+          $("console-error").textContent = error.message;
+        }
+      }
 
-  function deliveryRow(delivery) {
-    const row = el("tr", {},
-      el("td", { textContent: delivery.id }),
-      el("td", { textContent: delivery.eventType }),
-      el("td", { className: "url", textContent: delivery.endpointUrl, title: delivery.endpointUrl }),
-      el("td", {}, pill(delivery.status)),
-      el("td", { textContent: delivery.attemptCount }),
-      el("td", { textContent: delivery.status === "pending" ? time(delivery.nextAttemptAt) : "—" }),
-    );
-    row.addEventListener("click", () => showDetails(delivery.id));
-    return row;
-  }
+      function deliveryRow(delivery) {
+        const row = el(
+          "tr",
+          {},
+          el("td", { textContent: delivery.id }),
+          el("td", { textContent: delivery.eventType }),
+          el("td", {
+            className: "url",
+            textContent: delivery.endpointUrl,
+            title: delivery.endpointUrl,
+          }),
+          el("td", {}, pill(delivery.status)),
+          el("td", { textContent: delivery.attemptCount }),
+          el("td", {
+            textContent: delivery.status === "pending" ? time(delivery.nextAttemptAt) : "—",
+          }),
+        );
+        row.addEventListener("click", () => showDetails(delivery.id));
+        return row;
+      }
 
-  async function showDetails(id) {
-    selectedDeliveryId = id;
-    const delivery = await api(`/deliveries/${id}`);
-    const replay = delivery.status === "dead" ? el("button", { textContent: "Replay" }) : null;
-    replay?.addEventListener("click", async () => {
-      await api(`/deliveries/${id}/replay`, { method: "POST" });
-      refreshConsole();
-    });
-    $("details").classList.remove("hidden");
-    $("details").replaceChildren(
-      el("div", { className: "row" }, el("h2", { textContent: `Delivery ${delivery.id}` }), pill(delivery.status), replay),
-      el("p", { className: "small" }, "Event ", el("code", { textContent: delivery.eventId }), " → ", el("code", { textContent: delivery.endpointUrl })),
-      attemptList(delivery.attempts),
-      el("pre", { textContent: JSON.stringify(delivery.payload, null, 2) }),
-    );
-  }
+      async function showDetails(id) {
+        selectedDeliveryId = id;
+        const delivery = await api(`/deliveries/${id}`);
+        const replay = delivery.status === "dead" ? el("button", { textContent: "Replay" }) : null;
+        replay?.addEventListener("click", async () => {
+          await api(`/deliveries/${id}/replay`, { method: "POST" });
+          refreshConsole();
+        });
+        $("details").classList.remove("hidden");
+        $("details").replaceChildren(
+          el(
+            "div",
+            { className: "row" },
+            el("h2", { textContent: `Delivery ${delivery.id}` }),
+            pill(delivery.status),
+            replay,
+          ),
+          el(
+            "p",
+            { className: "small" },
+            "Event ",
+            el("code", { textContent: delivery.eventId }),
+            " → ",
+            el("code", { textContent: delivery.endpointUrl }),
+          ),
+          attemptList(delivery.attempts),
+          el("pre", { textContent: JSON.stringify(delivery.payload, null, 2) }),
+        );
+      }
 
-  if (apiKey) { $("api-key").value = apiKey; refreshConsole(); }
-  setInterval(refreshConsole, 3000);
-</script>
-</body>
+      if (apiKey) {
+        $("api-key").value = apiKey;
+        refreshConsole();
+      }
+      setInterval(refreshConsole, 3000);
+    </script>
+  </body>
 </html>

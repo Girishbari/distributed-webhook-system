@@ -104,12 +104,21 @@ export class PostgresDeliveryRepository implements DeliveryQueue, DeliveryRecord
     return rows.map((row) => ({
       deliveryId: row.id,
       attemptCount: row.attempts,
-      event: { id: row.event_id, type: row.type, payload: row.payload, createdAt: row.event_created_at },
+      event: {
+        id: row.event_id,
+        type: row.type,
+        payload: row.payload,
+        createdAt: row.event_created_at,
+      },
       endpoint: { id: row.endpoint_id, url: row.url, secret: row.secret },
     }));
   }
 
-  async saveAttemptResult(deliveryId: string, result: AttemptResult, next: NextStep): Promise<void> {
+  async saveAttemptResult(
+    deliveryId: string,
+    result: AttemptResult,
+    next: NextStep,
+  ): Promise<void> {
     await this.pool.query(
       `WITH attempt AS (
          INSERT INTO attempts (delivery_id, status_code, error, duration_ms)

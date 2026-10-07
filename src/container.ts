@@ -35,8 +35,16 @@ export const deliveryWorker = new DeliveryWorker(
     queue: deliveryRepository,
     sender: new HttpWebhookSender(5_000),
     signer: new HmacSha256Signer(),
-    retryPolicy: new ExponentialRetryPolicy({ maxAttempts: 4, firstDelayMs: 10_000, multiplier: 3, jitter: 0.2 }),
-    circuitBreaker: new CircuitBreaker(endpointRepository, { failureThreshold: 10, pauseMs: 60_000 }),
+    retryPolicy: new ExponentialRetryPolicy({
+      maxAttempts: 4,
+      firstDelayMs: 10_000,
+      multiplier: 3,
+      jitter: 0.2,
+    }),
+    circuitBreaker: new CircuitBreaker(endpointRepository, {
+      failureThreshold: 10,
+      pauseMs: 60_000,
+    }),
     workSignal,
   },
   { concurrency: 100, batchSize: 50, leaseMs: 30_000 },

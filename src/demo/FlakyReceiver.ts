@@ -85,7 +85,10 @@ export class FlakyReceiver {
 
   private hasValidSignature(request: IncomingMessage, body: string): boolean {
     const timestamp = request.headers["x-webhook-timestamp"] as string | undefined;
-    const signature = (request.headers["x-webhook-signature"] as string | undefined)?.replace(/^v1=/, "");
+    const signature = (request.headers["x-webhook-signature"] as string | undefined)?.replace(
+      /^v1=/,
+      "",
+    );
     if (!timestamp || !signature) return false;
     if (Math.abs(Date.now() / 1000 - Number(timestamp)) > toleranceSeconds) return false;
     return signer.verify(this.secret, `${timestamp}.${body}`, signature);

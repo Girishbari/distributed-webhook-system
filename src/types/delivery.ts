@@ -49,6 +49,4 @@ export type AttemptResult = {
 export type AttemptOutcome = "success" | "retryable" | "fatal";
 
 export type NextStep =
-  | { status: "delivered" }
-  | { status: "pending"; nextAttemptAt: Date }
-  | { status: "dead" };
+  { status: "delivered" } | { status: "pending"; nextAttemptAt: Date } | { status: "dead" };

@@ -53,12 +53,17 @@ export class DeliveryWorker {
           continue;
         }
 
-        const batch = await queue.claimDue(Math.min(freeSlots, this.settings.batchSize), this.settings.leaseMs);
+        const batch = await queue.claimDue(
+          Math.min(freeSlots, this.settings.batchSize),
+          this.settings.leaseMs,
+        );
         batch.forEach((due) => this.track(this.deliver(due)));
         if (batch.length > 0) continue;
 
         const msUntilNextDue = await queue.msUntilNextDue();
-        await workSignal.waitForWork(msUntilNextDue === null ? null : Math.max(msUntilNextDue, 100));
+        await workSignal.waitForWork(
+          msUntilNextDue === null ? null : Math.max(msUntilNextDue, 100),
+        );
       } catch (error) {
         console.error("worker loop failed, retrying in 5s", error);
         await sleep(5000);
@@ -78,10 +83,17 @@ export class DeliveryWorker {
       const result = await sender.send(this.buildRequest(due));
       const outcome = retryPolicy.classify(result);
 
-      await queue.saveAttemptResult(due.deliveryId, result, retryPolicy.nextStep(due.attemptCount + 1, outcome));
+      await queue.saveAttemptResult(
+        due.deliveryId,
+        result,
+        retryPolicy.nextStep(due.attemptCount + 1, outcome),
+      );
       await circuitBreaker.record(due.endpoint.id, outcome !== "retryable");
     } catch (error) {
-      console.error(`delivery ${due.deliveryId} failed to record; lease will expire and retry`, error);
+      console.error(
+        `delivery ${due.deliveryId} failed to record; lease will expire and retry`,
+        error,
+      );
     } finally {
       workSignal.wake();
     }
@@ -89,7 +101,12 @@ export class DeliveryWorker {
 
   private buildRequest(due: DueDelivery): WebhookRequest {
     const { event, endpoint } = due;
-    const body = JSON.stringify({ id: event.id, type: event.type, createdAt: event.createdAt, payload: event.payload });
+    const body = JSON.stringify({
+      id: event.id,
+      type: event.type,
+      createdAt: event.createdAt,
+      payload: event.payload,
+    });
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const signature = this.dependencies.signer.sign(endpoint.secret, `${timestamp}.${body}`);
 

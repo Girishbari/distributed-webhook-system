@@ -29,7 +29,14 @@ export class PostgresEndpointRepository implements EndpointRepository, EndpointH
     await this.pool.query(
       `INSERT INTO endpoints (id, url, event_types, secret, enabled, created_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [endpoint.id, endpoint.url, endpoint.eventTypes, endpoint.secret, endpoint.enabled, endpoint.createdAt],
+      [
+        endpoint.id,
+        endpoint.url,
+        endpoint.eventTypes,
+        endpoint.secret,
+        endpoint.enabled,
+        endpoint.createdAt,
+      ],
     );
   }
 
@@ -74,7 +81,11 @@ export class PostgresEndpointRepository implements EndpointRepository, EndpointH
     );
   }
 
-  async recordFailure(endpointId: string, failureThreshold: number, pauseMs: number): Promise<void> {
+  async recordFailure(
+    endpointId: string,
+    failureThreshold: number,
+    pauseMs: number,
+  ): Promise<void> {
     await this.pool.query(
       `UPDATE endpoints SET
          consecutive_failures = consecutive_failures + 1,

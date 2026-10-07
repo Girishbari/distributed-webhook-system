@@ -50,6 +50,7 @@ export class PublicHttpsUrlPolicy implements ReceiverUrlPolicy {
         );
 
     if (addresses.length === 0) throw new BadRequestError("Receiver host does not resolve");
-    if (addresses.some(isPrivate)) throw new BadRequestError("Receiver URL must be a public address");
+    if (addresses.some(isPrivate))
+      throw new BadRequestError("Receiver URL must be a public address");
   }
 }

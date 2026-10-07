@@ -14,7 +14,13 @@ export class PostgresEventRepository implements EventRepository {
         `INSERT INTO events (id, type, payload, idempotency_key, created_at)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (idempotency_key) DO NOTHING`,
-        [event.id, event.type, JSON.stringify(event.payload), event.idempotencyKey, event.createdAt],
+        [
+          event.id,
+          event.type,
+          JSON.stringify(event.payload),
+          event.idempotencyKey,
+          event.createdAt,
+        ],
       );
 
       if (inserted.rowCount === 0) {

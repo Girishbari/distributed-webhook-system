@@ -12,6 +12,9 @@ export async function sendTestEvent(request: Request, response: Response) {
   response.status(202).json(await demoService.sendTestEvent(url));
 }
 
-export async function getDemoDeliveries(request: Request<{ endpointId: string }>, response: Response) {
+export async function getDemoDeliveries(
+  request: Request<{ endpointId: string }>,
+  response: Response,
+) {
   response.json(await deliveryService.detailsForEndpoint(request.params.endpointId, 5));
 }

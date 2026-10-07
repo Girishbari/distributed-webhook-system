@@ -21,7 +21,10 @@ export class DemoService {
     const { eventId } = await this.publisher.publish(
       {
         type: DEMO_EVENT_TYPE,
-        payload: { message: "Hello from the webhook delivery service!", sentAt: new Date().toISOString() },
+        payload: {
+          message: "Hello from the webhook delivery service!",
+          sentAt: new Date().toISOString(),
+        },
         idempotencyKey: randomUUID(),
       },
       { onlyEndpointId: endpoint.id },

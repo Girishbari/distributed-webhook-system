@@ -32,7 +32,10 @@ export async function listEndpoints(_request: Request, response: Response) {
 }
 
 export async function updateEndpoint(request: Request<{ id: string }>, response: Response) {
-  const endpoint = await endpointService.update(request.params.id, validate(updateBody, request.body));
+  const endpoint = await endpointService.update(
+    request.params.id,
+    validate(updateBody, request.body),
+  );
   if (!endpoint) {
     response.status(404).json({ error: "Endpoint not found" });
     return;

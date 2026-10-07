@@ -1,5 +1,10 @@
 import { Router } from "express";
-import { deleteEndpoint, listEndpoints, registerEndpoint, updateEndpoint } from "../controllers/endpoint.controller";
+import {
+  deleteEndpoint,
+  listEndpoints,
+  registerEndpoint,
+  updateEndpoint,
+} from "../controllers/endpoint.controller";
 
 const router = Router();
 

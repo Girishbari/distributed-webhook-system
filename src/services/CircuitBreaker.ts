@@ -14,6 +14,10 @@ export class CircuitBreaker {
   record(endpointId: string, endpointResponded: boolean): Promise<void> {
     return endpointResponded
       ? this.health.recordSuccess(endpointId)
-      : this.health.recordFailure(endpointId, this.settings.failureThreshold, this.settings.pauseMs);
+      : this.health.recordFailure(
+          endpointId,
+          this.settings.failureThreshold,
+          this.settings.pauseMs,
+        );
   }
 }

@@ -5,7 +5,10 @@ import { FlakyReceiver } from "./FlakyReceiver";
 const eventCount = Number(process.argv[2] ?? 1000);
 const withOutage = process.argv.includes("--outage");
 const apiUrl = process.env.DEMO_API_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
-const headers = { authorization: `Bearer ${process.env.API_KEY}`, "content-type": "application/json" };
+const headers = {
+  authorization: `Bearer ${process.env.API_KEY}`,
+  "content-type": "application/json",
+};
 const runId = Date.now().toString(36);
 const eventType = "order.created";
 
@@ -23,7 +26,8 @@ async function api<T>(method: string, path: string, body?: unknown, extraHeaders
     headers: { ...headers, ...extraHeaders },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`${method} ${path} → ${response.status} ${await response.text()}`);
+  if (!response.ok)
+    throw new Error(`${method} ${path} → ${response.status} ${await response.text()}`);
   return response.status === 204 ? (undefined as T) : response.json();
 }
 
@@ -65,16 +69,22 @@ async function publishAll(): Promise<Set<string>> {
   let next = 0;
   const publishOne = async (index: number) => {
     const { eventId } = await retrying(() =>
-      api<{ eventId: string }>("POST", "/events", { type: eventType, payload: { orderId: index } }, {
-        "idempotency-key": `${runId}-${index}`,
-      }),
+      api<{ eventId: string }>(
+        "POST",
+        "/events",
+        { type: eventType, payload: { orderId: index } },
+        {
+          "idempotency-key": `${runId}-${index}`,
+        },
+      ),
     );
     published.add(eventId);
   };
   const lane = async () => {
     while (next < eventCount) {
       await publishOne(next++);
-      if (published.size % 500 === 0 && published.size < eventCount) process.stdout.write(`\r  published ${published.size}/${eventCount}`);
+      if (published.size % 500 === 0 && published.size < eventCount)
+        process.stdout.write(`\r  published ${published.size}/${eventCount}`);
     }
   };
   await Promise.all(Array.from({ length: 50 }, lane));
@@ -84,7 +94,9 @@ async function publishAll(): Promise<Set<string>> {
 
 async function totals(): Promise<DeliveryStats> {
   const all = await Promise.all(
-    [...endpointIds.values()].map((id) => retrying(() => api<DeliveryStats>("GET", `/deliveries/stats?endpointId=${id}`))),
+    [...endpointIds.values()].map((id) =>
+      retrying(() => api<DeliveryStats>("GET", `/deliveries/stats?endpointId=${id}`)),
+    ),
   );
   return all.reduce((sum, stats) => ({
     pending: sum.pending + stats.pending,
@@ -96,7 +108,9 @@ async function totals(): Promise<DeliveryStats> {
 async function waitUntilDrained(): Promise<DeliveryStats> {
   for (;;) {
     const stats = await totals();
-    process.stdout.write(`\r  delivered ${stats.delivered} · pending ${stats.pending} · dead ${stats.dead}      `);
+    process.stdout.write(
+      `\r  delivered ${stats.delivered} · pending ${stats.pending} · dead ${stats.dead}      `,
+    );
     if (stats.pending === 0) {
       process.stdout.write("\n");
       return stats;
@@ -131,8 +145,16 @@ function report(published: Set<string>, replayed: number, startedAt: number) {
     ["expected (event, receiver) pairs", expected, ""],
     ["processed pairs", processed, lost === 0 ? "✓ lost: 0" : `✗ lost: ${lost}`],
     ["HTTP requests received", requests, `${(requests / expected).toFixed(2)} per pair (retries)`],
-    ["re-sent after already processed", repeats, "lost acks; a receiver without dedupe would double-process these"],
-    ["processed twice", processedTwice, processedTwice === 0 ? "✓ receiver dedupes on event id" : "✗"],
+    [
+      "re-sent after already processed",
+      repeats,
+      "lost acks; a receiver without dedupe would double-process these",
+    ],
+    [
+      "processed twice",
+      processedTwice,
+      processedTwice === 0 ? "✓ receiver dedupes on event id" : "✗",
+    ],
     ["bad signatures", badSignatures, badSignatures === 0 ? "✓" : "✗"],
     ["dead → replayed", replayed, "all recovered after replay"],
     ["total time", `${((Date.now() - startedAt) / 1000).toFixed(0)}s`, ""],
@@ -145,7 +167,9 @@ function report(published: Set<string>, replayed: number, startedAt: number) {
 
 async function main() {
   const startedAt = Date.now();
-  console.log(`Demo run ${runId}: ${eventCount} events → ${receivers.length} flaky receivers${withOutage ? " (with outage)" : ""}`);
+  console.log(
+    `Demo run ${runId}: ${eventCount} events → ${receivers.length} flaky receivers${withOutage ? " (with outage)" : ""}`,
+  );
 
   await disableOldDemoEndpoints();
   await registerReceivers();
@@ -161,7 +185,9 @@ async function main() {
   for (let round = 1; stats.dead > 0 && round <= 5; round++) {
     console.log(`Replaying ${stats.dead} dead deliveries (round ${round})…`);
     for (const id of endpointIds.values()) {
-      replayed += (await api<{ replayed: number }>("POST", "/deliveries/replay", { endpointId: id })).replayed;
+      replayed += (
+        await api<{ replayed: number }>("POST", "/deliveries/replay", { endpointId: id })
+      ).replayed;
     }
     stats = await waitUntilDrained();
   }

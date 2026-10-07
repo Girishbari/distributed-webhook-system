@@ -18,7 +18,9 @@ export class DeliveryService {
 
   async detailsForEndpoint(endpointId: string, limit: number): Promise<DeliveryDetails[]> {
     const deliveries = await this.records.list({ endpointId, limit });
-    const details = await Promise.all(deliveries.map((delivery) => this.records.findDetails(delivery.id)));
+    const details = await Promise.all(
+      deliveries.map((delivery) => this.records.findDetails(delivery.id)),
+    );
     return details.filter((detail) => detail !== undefined);
   }
 

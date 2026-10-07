@@ -26,7 +26,8 @@ export class ExponentialRetryPolicy implements RetryPolicy {
 
   nextStep(attemptNumber: number, outcome: AttemptOutcome): NextStep {
     if (outcome === "success") return { status: "delivered" };
-    if (outcome === "fatal" || attemptNumber >= this.settings.maxAttempts) return { status: "dead" };
+    if (outcome === "fatal" || attemptNumber >= this.settings.maxAttempts)
+      return { status: "dead" };
     return { status: "pending", nextAttemptAt: new Date(Date.now() + this.delayMs(attemptNumber)) };
   }
 

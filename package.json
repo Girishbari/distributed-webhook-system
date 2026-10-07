@@ -11,7 +11,9 @@
     "start": "node dist/db/migrate.js && node dist/main.js",
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx --env-file=.env src/db/migrate.ts",
-    "demo": "tsx --env-file=.env src/demo/run.ts"
+    "demo": "tsx --env-file=.env src/demo/run.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "express": "^5.2.1",
@@ -22,6 +24,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "24",
     "@types/pg": "^8.23.1",
+    "prettier": "^3.9.9",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
