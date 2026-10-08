@@ -8,38 +8,10 @@ A service that reliably delivers webhooks to other apps, the way Stripe does for
 - **Dashboard** to inspect every delivery and attempt, and replay failures
 - **Circuit breaker** so one dead receiver can't slow down the healthy ones
 
-**Live demo:** _add the Render URL here_ (free tier: the first visit may take about a minute while it wakes up). Paste a [webhook.site](https://webhook.site) URL into **Try it** and watch a signed webhook arrive.
+**Live demo:** https://distributed-webhook-system.onrender.com/.
 
 ## The proof: 100k events, flaky receivers, nothing lost
 
-The repo has three separate apps, and only **X** is the product. The other two are stand-ins that talk to X purely over HTTP, the way real apps would:
-
-| App             | Plays               | Does                                                                                 |
-| --------------- | ------------------- | ------------------------------------------------------------------------------------ |
-| `apps/x`        | the webhook service | Accepts events, delivers them, retries, signs; dashboard. **The only app deployed.** |
-| `apps/shop`     | a sender            | Publishes events through X's API; afterwards checks what arrived                     |
-| `apps/receiver` | three receivers     | Flaky servers on ports 4001–4003 with their own database to dedupe                   |
-
-The receivers fail on purpose: 20% answer 500, 2% hang past the timeout, and 8% **process the event and then answer 500**. That last case is a lost acknowledgement, which forces real duplicates. A receiver remembers what it processed in its own Postgres table with `PRIMARY KEY (receiver, event_id)`, the way a real idempotent consumer would.
-
-A real run (300 events; [step-by-step instructions](#running-the-demo-step-by-step) below):
-
-```
-$ pnpm --filter shop check
-  events the shop published                 300
-  expected (event, receiver) pairs          900   3 receivers
-  processed pairs                           900   ✓ lost: 0
-  HTTP requests received                   1341   includes retries
-  re-sent after already processed           123   lost acks, ignored by receiver
-  processed twice                             0   ✓ impossible: PRIMARY KEY (receiver, event_id)
-  bad signatures                              0   ✓
-  X: still pending                            0   ✓
-  X: dead                                     0   ✓   (13 had died and were replayed)
-```
-
-In an earlier run with one receiver taken down for 60s, the circuit breaker allowed 17 refused connections (all within the first second), then paused that endpoint until it came back.
-
-The line to look at is **"re-sent after already processed"** next to **"processed twice: 0"**. Exactly-once delivery over a network is impossible: if a receiver's "200 OK" gets lost, the sender can't tell whether the event arrived. So the service guarantees **at-least-once** delivery, every event carries a unique id, and receivers ignore ids they've already handled. Together that gives **effectively exactly-once processing**, shown above with real numbers.
 
 ## Architecture
 
@@ -58,18 +30,6 @@ The line to look at is **"re-sent after already processed"** next to **"processe
                                      Receivers
 ```
 
-| Decision                                                        | Why                                                                                                |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Postgres is the queue** (`FOR UPDATE SKIP LOCKED`)            | ~1.4k sends/s fits one database; one system to run; event + deliveries saved atomically            |
-| **Fan-out inside `POST /events`, one transaction**              | There's never an event without its deliveries, even if the process crashes                         |
-| **`Idempotency-Key` header, enforced by a `UNIQUE` constraint** | A sender retrying after a lost `202` doesn't create duplicates                                     |
-| **Lease via `next_attempt_at`**                                 | Claiming a delivery pushes its due time 30s ahead; if the worker dies, it simply becomes due again |
-| **Backoff 10s → 30s → 90s, ±20% jitter, then dead**             | Rides out a one-minute outage; jitter stops retry stampedes                                        |
-| **Circuit breaker: 10 failures in a row → pause 1 min**         | Dead receivers stop occupying workers; paused time doesn't use up retries                          |
-| **Worker sleeps when idle, woken in-memory by the API**         | The database can scale to zero (Neon free tier) instead of being polled every second               |
-| **No ordering guarantee**                                       | Ordering means head-of-line blocking; receivers dedupe by id and refetch state instead             |
-
-The table above is the short version of the full design: requirements, estimates, schema, trade-offs and a decision log.
 
 ## Verifying a webhook (receiver side)
 
@@ -150,18 +110,6 @@ pnpm --filter x db:migrate
 - **Start fresh:** `pnpm --filter receiver reset` forgets what the receivers processed.
 
 `pnpm --filter x dev` runs the API and worker together in one process, which is how X runs in production.
-
-## Deploying to Render (free)
-
-Only `apps/x` is deployed. The shop and receiver are local stand-ins. The database is a free [Neon](https://neon.com) Postgres.
-
-1. Push this repo to GitHub. In Render, choose **New → Blueprint** and pick the repo; [render.yaml](render.yaml) describes the service.
-2. When Render asks for `DATABASE_URL`, paste the Neon **pooled** connection string. Render generates `API_KEY` itself; you'll find it under the service's **Environment** tab, and you need it to unlock the operator console.
-3. Render builds with `pnpm --filter "x..." build` (X plus the shared packages it uses). It starts with the schema migration and then one process that runs both the API and the worker. Node 24 comes from [.node-version](.node-version).
-
-On the free plan the service **sleeps after 15 minutes without visitors and takes about a minute to wake up**. Nothing is lost while it sleeps: pending deliveries wait in Postgres, and the worker picks them up as soon as the service wakes.
-
-With `ALLOW_PRIVATE_URLS=false`, receiver URLs must be `https` and must resolve to public addresses, so the service can't be pointed at its own internal network.
 
 ## Project structure
 
