@@ -29,3 +29,18 @@ export class InMemoryWorkSignal implements WorkSignal {
     });
   }
 }
+
+export class PollingWorkSignal implements WorkSignal {
+  private readonly inner = new InMemoryWorkSignal();
+
+  constructor(private readonly pollEveryMs: number) {}
+
+  wake(): void {
+    this.inner.wake();
+  }
+
+  waitForWork(timeoutMs: number | null): Promise<void> {
+    const cappedMs = timeoutMs === null ? this.pollEveryMs : Math.min(timeoutMs, this.pollEveryMs);
+    return this.inner.waitForWork(cappedMs);
+  }
+}

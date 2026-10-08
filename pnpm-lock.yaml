@@ -165,7 +165,63 @@ settings:
 importers:
 
   .:
+    devDependencies:
+      prettier:
+        specifier: ^3.9.9
+        version: 3.9.9
+
+  apps/receiver:
     dependencies:
+      '@webhook/demo-report':
+        specifier: workspace:*
+        version: link:../../packages/demo-report
+      '@webhook/signature':
+        specifier: workspace:*
+        version: link:../../packages/signature
+      '@webhook/x-client':
+        specifier: workspace:*
+        version: link:../../packages/x-client
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
+    devDependencies:
+      '@types/node':
+        specifier: '24'
+        version: 24.19.1
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  apps/shop:
+    dependencies:
+      '@webhook/demo-report':
+        specifier: workspace:*
+        version: link:../../packages/demo-report
+      '@webhook/x-client':
+        specifier: workspace:*
+        version: link:../../packages/x-client
+    devDependencies:
+      '@types/node':
+        specifier: '24'
+        version: 24.19.1
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  apps/x:
+    dependencies:
+      '@webhook/signature':
+        specifier: workspace:*
+        version: link:../../packages/signature
       express:
         specifier: ^5.2.1
         version: 5.2.1
@@ -185,12 +241,29 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
-      prettier:
-        specifier: ^3.9.9
-        version: 3.9.9
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/demo-report: {}
+
+  packages/signature:
+    devDependencies:
+      '@types/node':
+        specifier: '24'
+        version: 24.19.1
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/x-client:
+    devDependencies:
+      '@types/node':
+        specifier: '24'
+        version: 24.19.1
       typescript:
         specifier: ^7.0.2
         version: 7.0.2

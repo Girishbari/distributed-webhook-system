@@ -8,28 +8,36 @@ A service that reliably delivers webhooks to other apps, the way Stripe does for
 - **Dashboard** to inspect every delivery and attempt, and replay failures
 - **Circuit breaker** so one dead receiver can't slow down the healthy ones
 
-**Live demo:** _add the Railway URL here_. Paste a [webhook.site](https://webhook.site) URL into **Try it** and watch a signed webhook arrive.
+**Live demo:** _add the Render URL here_ (free tier: the first visit may take about a minute while it wakes up). Paste a [webhook.site](https://webhook.site) URL into **Try it** and watch a signed webhook arrive.
 
 ## The proof: 100k events, flaky receivers, nothing lost
 
-`pnpm demo <count> --outage` publishes events to three fake receivers that fail on purpose:
-20% answer 500, 2% hang past the timeout, 8% **process the event and then answer 500** (a lost acknowledgement, which forces real duplicates), and one receiver goes down completely for a minute.
-A checker then compares what was published with what each receiver processed.
+The repo has three separate apps, and only **X** is the product. The other two are stand-ins that talk to X purely over HTTP, the way real apps would:
+
+| App             | Plays               | Does                                                                                 |
+| --------------- | ------------------- | ------------------------------------------------------------------------------------ |
+| `apps/x`        | the webhook service | Accepts events, delivers them, retries, signs; dashboard. **The only app deployed.** |
+| `apps/shop`     | a sender            | Publishes events through X's API; afterwards checks what arrived                     |
+| `apps/receiver` | three receivers     | Flaky servers on ports 4001–4003 with their own database to dedupe                   |
+
+The receivers fail on purpose: 20% answer 500, 2% hang past the timeout, and 8% **process the event and then answer 500**. That last case is a lost acknowledgement, which forces real duplicates. A receiver remembers what it processed in its own Postgres table with `PRIMARY KEY (receiver, event_id)`, the way a real idempotent consumer would.
+
+A real run (300 events; [step-by-step instructions](#running-the-demo-step-by-step) below):
 
 ```
-$ pnpm demo 500 --outage          # a 500-event run with one receiver down for 60s
-  events published                          500
-  expected (event, receiver) pairs         1500
-  processed pairs                          1500   ✓ lost: 0
-  HTTP requests received                   2130   1.42 per pair (retries)
-  re-sent after already processed           165   lost acks; a receiver without dedupe would double-process these
-  processed twice                             0   ✓ receiver dedupes on event id
+$ pnpm --filter shop check
+  events the shop published                 300
+  expected (event, receiver) pairs          900   3 receivers
+  processed pairs                           900   ✓ lost: 0
+  HTTP requests received                   1341   includes retries
+  re-sent after already processed           123   lost acks, ignored by receiver
+  processed twice                             0   ✓ impossible: PRIMARY KEY (receiver, event_id)
   bad signatures                              0   ✓
-  dead → replayed                            11   all recovered after replay
-
-During the 60s outage the circuit breaker allowed 17 refused connections (all within one second),
-then paused the endpoint; no further attempts hit the dead receiver until it recovered.
+  X: still pending                            0   ✓
+  X: dead                                     0   ✓   (13 had died and were replayed)
 ```
+
+In an earlier run with one receiver taken down for 60s, the circuit breaker allowed 17 refused connections (all within the first second), then paused that endpoint until it came back.
 
 The line to look at is **"re-sent after already processed"** next to **"processed twice: 0"**. Exactly-once delivery over a network is impossible: if a receiver's "200 OK" gets lost, the sender can't tell whether the event arrived. So the service guarantees **at-least-once** delivery, every event carries a unique id, and receivers ignore ids they've already handled. Together that gives **effectively exactly-once processing**, shown above with real numbers.
 
@@ -61,7 +69,7 @@ The line to look at is **"re-sent after already processed"** next to **"processe
 | **Worker sleeps when idle, woken in-memory by the API**         | The database can scale to zero (Neon free tier) instead of being polled every second               |
 | **No ordering guarantee**                                       | Ordering means head-of-line blocking; receivers dedupe by id and refetch state instead             |
 
-The full design (requirements, estimates, schema, trade-offs, decision log) is in [DESIGN.md](DESIGN.md).
+The table above is the short version of the full design: requirements, estimates, schema, trade-offs and a decision log.
 
 ## Verifying a webhook (receiver side)
 
@@ -105,46 +113,86 @@ All routes except `/health` and `/demo/*` need `Authorization: Bearer <API_KEY>`
 | `POST`   | `/deliveries/replay`                     | Replay all dead, optionally `{ endpointId }`                                                |
 | `POST`   | `/demo/test-event`                       | Public, rate limited: send a signed test event to `{ url }`                                 |
 
-## Running locally
+## Running the demo step by step
 
-Needs Node 22+, pnpm and a Postgres database (a free [Neon](https://neon.com) project works).
+Needs Node 22+, pnpm and Postgres (for example `docker run -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres`).
+
+**Setup, once:**
 
 ```bash
 pnpm install
-cp .env.example .env        # fill in DATABASE_URL and API_KEY; set ALLOW_PRIVATE_URLS=true for local receivers
-pnpm db:migrate
-pnpm dev                    # API + worker + dashboard on http://localhost:3000
-pnpm demo 1000              # in a second terminal; add --outage to take one receiver down for 60s
 ```
 
-## Deploying to Railway
+Then copy each app's `.env.example` to `.env`:
 
-1. Push this repo to GitHub, then in Railway choose **New project → Deploy from GitHub repo**.
-2. Add the variables `DATABASE_URL`, `API_KEY` (a long random string) and `ALLOW_PRIVATE_URLS=false`.
-3. Railway builds with `pnpm build` and starts with `pnpm start`, which applies the schema and then starts the server ([railway.json](railway.json)).
-4. Under **Settings → Networking**, generate a public domain.
+- `apps/x/.env`: `DATABASE_URL`, an `API_KEY`, and `ALLOW_PRIVATE_URLS=true` (lets X deliver to `localhost`)
+- `apps/shop/.env` and `apps/receiver/.env`: the same `API_KEY` as `X_API_KEY`. The receiver's `DATABASE_URL` points at its own database, which it creates on first start.
+
+```bash
+pnpm --filter x db:migrate
+```
+
+**Each step in its own terminal:**
+
+| Step                                      | Command                                    | What you see                                                         |
+| ----------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------- |
+| 0. X accepts events, delivers nothing yet | `pnpm --filter x api`                      | Dashboard on http://localhost:3000                                   |
+| 1. Receivers start and register with X    | `pnpm --filter receiver start`             | Three endpoints registered, secrets saved                            |
+| 2. The shop publishes events              | `pnpm --filter shop publish-events 100000` | Events saved; every delivery is **pending**                          |
+| 3. X starts delivering                    | `pnpm --filter x worker`                   | Pending goes down in the dashboard; retries back off 10s → 30s → 90s |
+| 4. Operator replays failures              | Dashboard: **Replay all dead**             | Dead deliveries go back to pending and get delivered                 |
+| 5. Check                                  | `pnpm --filter shop check`                 | The table above                                                      |
+
+**Optional experiments:**
+
+- **Receiver outage:** stop the receiver with Ctrl+C during step 3, then start it again. The circuit breaker pauses its endpoints, and nothing is forgotten because the receiver keeps its records in its own database.
+- **X crash:** stop the worker and start it again. Its leases expire and the deliveries are picked up again.
+- **Start fresh:** `pnpm --filter receiver reset` forgets what the receivers processed.
+
+`pnpm --filter x dev` runs the API and worker together in one process, which is how X runs in production.
+
+## Deploying to Render (free)
+
+Only `apps/x` is deployed. The shop and receiver are local stand-ins. The database is a free [Neon](https://neon.com) Postgres.
+
+1. Push this repo to GitHub. In Render, choose **New → Blueprint** and pick the repo; [render.yaml](render.yaml) describes the service.
+2. When Render asks for `DATABASE_URL`, paste the Neon **pooled** connection string. Render generates `API_KEY` itself; you'll find it under the service's **Environment** tab, and you need it to unlock the operator console.
+3. Render builds with `pnpm --filter "x..." build` (X plus the shared packages it uses). It starts with the schema migration and then one process that runs both the API and the worker. Node 24 comes from [.node-version](.node-version).
+
+On the free plan the service **sleeps after 15 minutes without visitors and takes about a minute to wake up**. Nothing is lost while it sleeps: pending deliveries wait in Postgres, and the worker picks them up as soon as the service wakes.
 
 With `ALLOW_PRIVATE_URLS=false`, receiver URLs must be `https` and must resolve to public addresses, so the service can't be pointed at its own internal network.
 
 ## Project structure
 
 ```
-src/
-  routes/        plain Express routers
-  controllers/   read the request, validate with zod, call a service, send the response
-  services/      the logic, one job per class, depending on interfaces
-                 EventPublisher · DeliveryWorker · RetryPolicy · CircuitBreaker
-                 PayloadSigner · WebhookSender · ReceiverUrlPolicy · WorkSignal …
-  repositories/  interfaces + Postgres implementations
-  types/         plain data types
-  container.ts   the one place where everything is created and wired together
-  demo/          flaky receivers + the load-and-check script
-db/schema.sql    tables and indexes
-public/          the dashboard (one static page)
+apps/
+  x/                    the product (deployed)
+    src/
+      routes/           plain Express routers
+      controllers/      read the request, validate with zod, call a service, send the response
+      services/         the logic, one job per class, depending on interfaces
+                        EventPublisher · DeliveryWorker · RetryPolicy · CircuitBreaker
+                        PayloadSigner · WebhookSender · ReceiverUrlPolicy · WorkSignal …
+      repositories/     interfaces + Postgres implementations
+      types/            plain data types
+      container.ts      the one place where everything is created and wired together
+      main.ts           API + worker in one process (production)
+      api.ts, worker.ts the same two halves as separate processes
+    db/schema.sql       tables and indexes
+    public/             the dashboard (one static page)
+  shop/                 stand-in sender: publish events, check results
+  receiver/             stand-in receivers: flaky servers + their own database
+packages/               shared code, used by more than one app
+  signature/            sign (X) and verify (receiver) webhooks: HMAC-SHA256, header names, 5-min tolerance
+  x-client/             typed client for X's API, used by the shop and the receiver
+  demo-report/          the ReceiverReport type the receiver serves and the shop checks
 ```
+
+`pnpm install` builds the packages automatically (a `prepare` script). After editing a package, rebuild it with `pnpm --filter "./packages/**" build`.
 
 ## Known limits
 
-- The API and worker share one process. That keeps the database able to sleep, but they can't be scaled separately yet; splitting them means swapping the in-memory `WorkSignal` for `LISTEN/NOTIFY` or polling.
+- In production the API and worker share one process, which lets the database scale to zero. Run separately (`api` + `worker`), the worker can't be woken in memory, so it polls every second through `PollingWorkSignal`. That's the same `WorkSignal` interface with a different implementation.
 - Receiver URLs are checked when they're registered, not again at send time (DNS rebinding).
 - The demo rate limit is in memory, so it applies per process.

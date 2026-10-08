@@ -13,7 +13,7 @@ import { HmacSha256Signer } from "./services/PayloadSigner";
 import { AllowAnyUrlPolicy, PublicHttpsUrlPolicy } from "./services/ReceiverUrlPolicy";
 import { ExponentialRetryPolicy } from "./services/RetryPolicy";
 import { HttpWebhookSender } from "./services/WebhookSender";
-import { InMemoryWorkSignal } from "./services/WorkSignal";
+import { InMemoryWorkSignal, type WorkSignal } from "./services/WorkSignal";
 
 export const config = loadConfig();
 export const pool = createPool(config.databaseUrl);
@@ -30,22 +30,24 @@ export const eventPublisher = new EventPublisher(eventRepository, workSignal);
 export const deliveryService = new DeliveryService(deliveryRepository, workSignal);
 export const demoService = new DemoService(endpointService, eventPublisher);
 
-export const deliveryWorker = new DeliveryWorker(
-  {
-    queue: deliveryRepository,
-    sender: new HttpWebhookSender(5_000),
-    signer: new HmacSha256Signer(),
-    retryPolicy: new ExponentialRetryPolicy({
-      maxAttempts: 4,
-      firstDelayMs: 10_000,
-      multiplier: 3,
-      jitter: 0.2,
-    }),
-    circuitBreaker: new CircuitBreaker(endpointRepository, {
-      failureThreshold: 10,
-      pauseMs: 60_000,
-    }),
-    workSignal,
-  },
-  { concurrency: 100, batchSize: 50, leaseMs: 30_000 },
-);
+export function createDeliveryWorker(signal: WorkSignal = workSignal): DeliveryWorker {
+  return new DeliveryWorker(
+    {
+      queue: deliveryRepository,
+      sender: new HttpWebhookSender(5_000),
+      signer: new HmacSha256Signer(),
+      retryPolicy: new ExponentialRetryPolicy({
+        maxAttempts: 4,
+        firstDelayMs: 10_000,
+        multiplier: 3,
+        jitter: 0.2,
+      }),
+      circuitBreaker: new CircuitBreaker(endpointRepository, {
+        failureThreshold: 10,
+        pauseMs: 60_000,
+      }),
+      workSignal: signal,
+    },
+    { concurrency: 100, batchSize: 50, leaseMs: 30_000 },
+  );
+}

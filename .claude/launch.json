@@ -4,7 +4,7 @@
     {
       "name": "webhook-delivery",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
+      "runtimeArgs": ["--filter", "x", "dev"],
       "port": 3000
     }
   ]

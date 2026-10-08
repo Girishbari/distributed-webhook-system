@@ -107,17 +107,13 @@ export class DeliveryWorker {
       createdAt: event.createdAt,
       payload: event.payload,
     });
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const signature = this.dependencies.signer.sign(endpoint.secret, `${timestamp}.${body}`);
 
     return {
       url: endpoint.url,
       body,
       headers: {
         "content-type": "application/json",
-        "x-webhook-id": event.id,
-        "x-webhook-timestamp": timestamp,
-        "x-webhook-signature": `v1=${signature}`,
+        ...this.dependencies.signer.sign(event.id, endpoint.secret, body),
       },
     };
   }

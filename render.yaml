@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: webhook-delivery
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter "x..." build
+    startCommand: cd apps/x && node dist/db/migrate.js && node dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: API_KEY
+        generateValue: true
+      - key: ALLOW_PRIVATE_URLS
+        value: "false"

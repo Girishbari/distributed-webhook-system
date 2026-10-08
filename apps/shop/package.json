@@ -1,0 +1,20 @@
+{
+  "name": "shop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "publish-events": "tsx --env-file=.env src/publish.ts",
+    "check": "tsx --env-file=.env src/check.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@webhook/demo-report": "workspace:*",
+    "@webhook/x-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

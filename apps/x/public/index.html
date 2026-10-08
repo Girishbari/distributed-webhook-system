@@ -1,0 +1,1211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Webhook Delivery Service</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;600&display=swap"
+    />
+    <style>
+      :root {
+        --paper: oklch(96.5% 0.018 85);
+        --paper-deep: oklch(93% 0.025 82);
+        --card: oklch(99.4% 0.006 85);
+        --ink: oklch(24% 0.035 265);
+        --ink-soft: oklch(44% 0.035 265);
+        --line: oklch(87% 0.022 80);
+        --red: oklch(55% 0.19 28);
+        --blue: oklch(43% 0.16 262);
+        --band: oklch(33% 0.13 264);
+        --band-ink: oklch(97% 0.02 85);
+        --band-soft: oklch(84% 0.05 255);
+        --accent: var(--blue);
+        --on-accent: oklch(99% 0.005 85);
+        --accent-tint: oklch(93% 0.035 262);
+        --ok: oklch(46% 0.12 150);
+        --ok-tint: oklch(94% 0.04 150);
+        --warn: oklch(48% 0.11 65);
+        --warn-tint: oklch(94% 0.05 85);
+        --bad: oklch(50% 0.19 28);
+        --bad-tint: oklch(94% 0.035 28);
+        --code: oklch(94.5% 0.018 85);
+        --shadow: 0 1px 2px oklch(30% 0.05 265 / 0.06), 0 8px 24px -12px oklch(30% 0.05 265 / 0.22);
+        --display: "Bricolage Grotesque", system-ui, sans-serif;
+        --body: system-ui, -apple-system, "Segoe UI", sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --paper: oklch(18.5% 0.035 265);
+          --paper-deep: oklch(16% 0.035 265);
+          --card: oklch(23.5% 0.04 265);
+          --ink: oklch(95% 0.015 85);
+          --ink-soft: oklch(77% 0.035 260);
+          --line: oklch(34% 0.04 265);
+          --red: oklch(68% 0.17 28);
+          --blue: oklch(74% 0.12 255);
+          --band: oklch(26% 0.09 266);
+          --band-ink: oklch(96% 0.02 85);
+          --band-soft: oklch(80% 0.06 255);
+          --accent: var(--blue);
+          --on-accent: oklch(20% 0.05 265);
+          --accent-tint: oklch(30% 0.06 262);
+          --ok: oklch(79% 0.14 150);
+          --ok-tint: oklch(28% 0.05 155);
+          --warn: oklch(84% 0.13 85);
+          --warn-tint: oklch(29% 0.05 80);
+          --bad: oklch(74% 0.15 25);
+          --bad-tint: oklch(29% 0.06 25);
+          --code: oklch(20% 0.035 265);
+          --shadow: 0 1px 2px oklch(0% 0 0 / 0.3), 0 10px 28px -14px oklch(0% 0 0 / 0.6);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scrollbar-color: var(--line) transparent;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        caret-color: var(--accent);
+        font: 15px/1.55 var(--body);
+        background-color: var(--paper);
+        background-image:
+          radial-gradient(oklch(from var(--ink) l c h / 0.07) 1px, transparent 1.4px),
+          linear-gradient(var(--paper), var(--paper-deep));
+        background-size:
+          22px 22px,
+          100% 100%;
+        background-attachment: fixed;
+      }
+      ::selection {
+        background: var(--accent);
+        color: var(--on-accent);
+      }
+      a {
+        color: inherit;
+        text-decoration-color: var(--red);
+        text-decoration-thickness: 2px;
+        text-underline-offset: 3px;
+      }
+      :focus-visible {
+        outline: 3px solid var(--red);
+        outline-offset: 2px;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      /* ---------- the envelope band ---------- */
+      .band {
+        position: relative;
+        background: var(--band);
+        color: var(--band-ink);
+        overflow: hidden;
+      }
+      .band::before,
+      .band::after {
+        content: "";
+        position: absolute;
+        inset-inline: 0;
+        height: 10px;
+        background: repeating-linear-gradient(
+          -45deg,
+          var(--red) 0 14px,
+          var(--band-ink) 14px 22px,
+          oklch(62% 0.14 255) 22px 36px,
+          var(--band-ink) 36px 44px
+        );
+      }
+      .band::before {
+        top: 0;
+      }
+      .band::after {
+        bottom: 0;
+      }
+      .band-inner {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 64px 20px 56px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+        gap: 40px;
+        align-items: center;
+      }
+      h1 {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: clamp(2.3rem, 5vw, 3.6rem);
+        line-height: 1;
+        letter-spacing: -0.03em;
+        margin: 0 0 18px;
+        text-wrap: balance;
+      }
+      .lede {
+        font-size: 1.05rem;
+        line-height: 1.6;
+        color: var(--band-soft);
+        max-width: 46ch;
+        margin: 0;
+      }
+      .facts {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0;
+        margin: 24px 0 0;
+      }
+      .facts li {
+        font-size: 13px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        border: 1px solid oklch(from var(--band-ink) l c h / 0.28);
+        color: var(--band-ink);
+      }
+      .route {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .route .wire {
+        fill: none;
+        stroke: oklch(from var(--band-ink) l c h / 0.35);
+        stroke-width: 1.5;
+        stroke-dasharray: 4 6;
+      }
+      .route .node rect {
+        fill: oklch(from var(--band-ink) l c h / 0.08);
+        stroke: oklch(from var(--band-ink) l c h / 0.4);
+      }
+      .route .node text {
+        fill: var(--band-ink);
+        font: 600 13px var(--body);
+      }
+      .route .node .sub {
+        fill: var(--band-soft);
+        font: 11px var(--body);
+      }
+      .route .hub rect {
+        fill: var(--band-ink);
+        stroke: none;
+      }
+      .route .hub text {
+        fill: var(--band);
+        font: 800 26px var(--display);
+      }
+      .route .hub .sub {
+        fill: oklch(from var(--band) l c h / 0.85);
+        font: 600 10.5px var(--body);
+      }
+      .route .flash {
+        fill: none;
+        stroke: var(--red);
+        stroke-width: 2;
+      }
+      .route .flash-label {
+        fill: var(--red);
+        font: 600 11px var(--mono);
+      }
+
+      /* ---------- page ---------- */
+      main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 40px 20px 72px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 28px;
+      }
+      h2 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 1.6rem;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        margin: 0 0 6px;
+      }
+      h3 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 1.15rem;
+        margin: 0;
+      }
+      p {
+        margin: 0 0 12px;
+      }
+      .muted {
+        color: var(--ink-soft);
+      }
+      .small {
+        font-size: 13.5px;
+      }
+      .intro {
+        max-width: 68ch;
+        margin-bottom: 20px;
+      }
+      .panel {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 28px;
+        box-shadow: var(--shadow);
+      }
+      .envelope {
+        padding: 8px;
+        border-radius: 22px;
+        background: repeating-linear-gradient(
+          -45deg,
+          var(--red) 0 16px,
+          var(--card) 16px 25px,
+          var(--blue) 25px 41px,
+          var(--card) 41px 50px
+        );
+        box-shadow: var(--shadow);
+      }
+      .envelope > .panel {
+        box-shadow: none;
+        border: none;
+      }
+
+      form,
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        padding: 10px 14px;
+        background: var(--paper);
+        color: var(--ink);
+        transition:
+          border-color 160ms ease-out,
+          background-color 160ms ease-out,
+          transform 160ms ease-out;
+      }
+      input::placeholder {
+        color: var(--ink-soft);
+      }
+      input:hover,
+      select:hover {
+        border-color: var(--ink-soft);
+      }
+      input[type="url"],
+      input[type="password"] {
+        flex: 1 1 300px;
+        min-width: 0;
+      }
+      button {
+        background: var(--accent);
+        color: var(--on-accent);
+        border-color: var(--accent);
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) {
+        background: oklch(from var(--accent) calc(l - 0.06) c h);
+      }
+      button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--ink);
+        border-color: var(--line);
+      }
+      button.secondary:hover:not(:disabled) {
+        background: var(--accent-tint);
+        border-color: var(--accent);
+      }
+      button.small-button {
+        padding: 6px 12px;
+        font-size: 13px;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: progress;
+      }
+      code,
+      pre {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        background: var(--code);
+        border-radius: 6px;
+      }
+      code {
+        padding: 2px 6px;
+        overflow-wrap: anywhere;
+      }
+      pre {
+        padding: 14px;
+        overflow-x: auto;
+        margin: 14px 0 0;
+        border: 1px solid var(--line);
+      }
+      .error {
+        color: var(--bad);
+        font-weight: 600;
+        margin: 10px 0 0;
+      }
+      .error:empty {
+        display: none;
+      }
+      .hidden {
+        display: none !important;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: capitalize;
+      }
+      .pill::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .pill.pending {
+        color: var(--warn);
+        background: var(--warn-tint);
+      }
+      .pill.delivered {
+        color: var(--ok);
+        background: var(--ok-tint);
+      }
+      .pill.dead {
+        color: var(--bad);
+        background: var(--bad-tint);
+      }
+
+      /* ---------- try it ---------- */
+      .result {
+        margin-top: 22px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: start;
+        padding-top: 22px;
+        border-top: 1px dashed var(--line);
+      }
+      .secret-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .postmark {
+        width: 136px;
+        height: 136px;
+        transform: rotate(-12deg);
+        transition: transform 300ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+      }
+      .postmark .ring {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 3;
+      }
+      .postmark .inner {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+      }
+      .postmark text {
+        fill: currentColor;
+        font: 700 11px var(--mono);
+        letter-spacing: 0.12em;
+      }
+      .postmark .big {
+        font: 800 12.5px var(--display);
+        letter-spacing: 0.02em;
+      }
+      .postmark.pending {
+        color: var(--warn);
+      }
+      .postmark.delivered {
+        color: var(--ok);
+        transform: rotate(-6deg) scale(1.04);
+      }
+      .postmark.dead {
+        color: var(--bad);
+      }
+      .attempts {
+        list-style: none;
+        padding: 0;
+        margin: 14px 0 0;
+        display: grid;
+        gap: 6px;
+        counter-reset: attempt;
+      }
+      .attempts li {
+        counter-increment: attempt;
+        display: grid;
+        grid-template-columns: 2.2em 6.5em 1fr auto;
+        gap: 10px;
+        align-items: baseline;
+        font: 12.5px var(--mono);
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: var(--code);
+        font-variant-numeric: tabular-nums;
+      }
+      .attempts li::before {
+        content: "#" counter(attempt);
+        color: var(--ink-soft);
+      }
+      .attempts .outcome.ok {
+        color: var(--ok);
+        font-weight: 600;
+      }
+      .attempts .outcome.fail {
+        color: var(--bad);
+        font-weight: 600;
+      }
+
+      /* ---------- console ---------- */
+      .console-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      #key-form {
+        flex: 0 1 440px;
+        flex-wrap: nowrap;
+      }
+      #key-form input {
+        flex: 1 1 auto;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin: 24px 0;
+      }
+      .stat {
+        border-radius: 14px;
+        padding: 16px 18px;
+      }
+      .stat span {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .stat b {
+        display: block;
+        font: 700 2rem/1.1 var(--display);
+        font-variant-numeric: tabular-nums;
+        margin-top: 4px;
+        color: var(--ink);
+      }
+      .stat.pending {
+        background: var(--warn-tint);
+        color: var(--warn);
+      }
+      .stat.delivered {
+        background: var(--ok-tint);
+        color: var(--ok);
+      }
+      .stat.dead {
+        background: var(--bad-tint);
+        color: var(--bad);
+      }
+      .table-wrap {
+        overflow-x: auto;
+        margin-top: 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+      th {
+        color: var(--ink-soft);
+        font-weight: 700;
+        font-size: 12px;
+        background: var(--code);
+      }
+      td.num,
+      td.id,
+      td.time {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        font-variant-numeric: tabular-nums;
+      }
+      tbody tr {
+        cursor: pointer;
+        transition: background-color 120ms ease-out;
+      }
+      tbody tr:hover {
+        background: var(--code);
+      }
+      tbody tr[aria-selected="true"] {
+        background: var(--accent-tint);
+      }
+      tbody tr:focus-visible {
+        outline-offset: -3px;
+      }
+      td.url {
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      td.empty {
+        text-align: center;
+        padding: 36px 14px;
+        color: var(--ink-soft);
+        cursor: default;
+      }
+      .details {
+        margin-top: 18px;
+        padding: 22px;
+        border-radius: 14px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+      }
+      .details .row {
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      @media (max-width: 860px) {
+        .band-inner {
+          grid-template-columns: 1fr;
+          padding-top: 48px;
+          gap: 28px;
+        }
+        .result {
+          grid-template-columns: 1fr;
+        }
+        .postmark {
+          width: 112px;
+          height: 112px;
+          order: -1;
+        }
+      }
+      @media (max-width: 560px) {
+        .panel {
+          padding: 20px;
+        }
+        .stats {
+          grid-template-columns: 1fr;
+        }
+        .attempts li {
+          grid-template-columns: 2.2em 1fr auto;
+        }
+        .attempts .when {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="band">
+      <div class="band-inner">
+        <div>
+          <h1>Webhook Delivery Service</h1>
+          <p class="lede">
+            Signed webhooks with retries, backoff, a circuit breaker and replay. Like Stripe's
+            webhooks, built from scratch on Node.js and Postgres.
+          </p>
+          <ul class="facts">
+            <li>HMAC-SHA256 signed</li>
+            <li>Retries 10s → 30s → 90s</li>
+            <li>At-least-once, deduped by id</li>
+          </ul>
+        </div>
+
+        <svg
+          class="route"
+          id="route"
+          viewBox="0 0 540 300"
+          role="img"
+          aria-label="Letters travel from the shop to X, which forwards each one to three receivers; one bounces and is retried."
+        >
+          <defs>
+            <g id="letter">
+              <rect x="-11" y="-7.5" width="22" height="15" rx="2" style="fill: var(--band-ink)" />
+              <path
+                d="M-11 -7.5 L0 1 L11 -7.5"
+                style="fill: none; stroke: var(--band); stroke-width: 1.2"
+              />
+              <path d="M-11 7.5 H11" style="stroke: var(--red); stroke-width: 2.5" />
+            </g>
+            <path id="p-in" d="M108 150 H206" />
+            <path id="p-a" d="M314 140 C360 140 370 58 420 58" />
+            <path id="p-b" d="M314 150 H420" />
+            <path id="p-c" d="M314 160 C360 160 370 242 420 242" />
+          </defs>
+
+          <use href="#p-in" class="wire" />
+          <use href="#p-a" class="wire" />
+          <use href="#p-b" class="wire" />
+          <use href="#p-c" class="wire" />
+
+          <g class="node">
+            <rect x="16" y="124" width="92" height="52" rx="12" />
+            <text x="62" y="147" text-anchor="middle">Shop</text>
+            <text x="62" y="164" text-anchor="middle" class="sub">sender</text>
+          </g>
+          <g class="hub">
+            <rect x="206" y="104" width="108" height="92" rx="18" />
+            <text x="260" y="150" text-anchor="middle">X</text>
+            <text x="260" y="174" text-anchor="middle" class="sub">signs · retries</text>
+          </g>
+          <g class="node">
+            <rect x="420" y="32" width="104" height="52" rx="12" />
+            <text x="472" y="55" text-anchor="middle">Warehouse</text>
+            <text x="472" y="72" text-anchor="middle" class="sub">receiver</text>
+          </g>
+          <g class="node">
+            <rect x="420" y="124" width="104" height="52" rx="12" />
+            <text x="472" y="147" text-anchor="middle">Billing</text>
+            <text x="472" y="164" text-anchor="middle" class="sub">receiver</text>
+          </g>
+          <g class="node">
+            <rect x="420" y="216" width="104" height="52" rx="12" />
+            <text x="472" y="239" text-anchor="middle">Email</text>
+            <text x="472" y="256" text-anchor="middle" class="sub">receiver</text>
+          </g>
+
+          <use href="#letter">
+            <animateMotion
+              dur="4s"
+              repeatCount="indefinite"
+              keyPoints="0;1;1"
+              keyTimes="0;0.25;1"
+              calcMode="linear"
+            >
+              <mpath href="#p-in" />
+            </animateMotion>
+          </use>
+          <use href="#letter" visibility="hidden">
+            <set attributeName="visibility" to="visible" begin="1s" />
+            <animateMotion
+              dur="4s"
+              begin="1s"
+              repeatCount="indefinite"
+              keyPoints="0;1;1"
+              keyTimes="0;0.3;1"
+              calcMode="linear"
+            >
+              <mpath href="#p-a" />
+            </animateMotion>
+          </use>
+          <use href="#letter" visibility="hidden">
+            <set attributeName="visibility" to="visible" begin="1s" />
+            <animateMotion
+              dur="4s"
+              begin="1s"
+              repeatCount="indefinite"
+              keyPoints="0;1;1"
+              keyTimes="0;0.25;1"
+              calcMode="linear"
+            >
+              <mpath href="#p-b" />
+            </animateMotion>
+          </use>
+          <use href="#letter" visibility="hidden">
+            <set attributeName="visibility" to="visible" begin="1s" />
+            <animateMotion
+              dur="4s"
+              begin="1s"
+              repeatCount="indefinite"
+              keyPoints="0;1;0.55;0.55;1;1"
+              keyTimes="0;0.25;0.38;0.55;0.75;1"
+              calcMode="linear"
+            >
+              <mpath href="#p-c" />
+            </animateMotion>
+          </use>
+          <circle class="flash" cx="420" cy="242" r="10" opacity="0">
+            <animate
+              attributeName="opacity"
+              values="0;1;0;0"
+              keyTimes="0;0.27;0.4;1"
+              dur="4s"
+              begin="1s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="r"
+              values="6;6;22;22"
+              keyTimes="0;0.25;0.4;1"
+              dur="4s"
+              begin="1s"
+              repeatCount="indefinite"
+            />
+          </circle>
+          <text class="flash-label" x="380" y="290" opacity="0">
+            500 · retry in 10s
+            <animate
+              attributeName="opacity"
+              values="0;0;1;1;0"
+              keyTimes="0;0.25;0.3;0.6;0.7"
+              dur="4s"
+              begin="1s"
+              repeatCount="indefinite"
+            />
+          </text>
+        </svg>
+      </div>
+    </header>
+
+    <main>
+      <div class="envelope">
+        <section class="panel" aria-labelledby="try-title">
+          <h2 id="try-title">Try it</h2>
+          <p class="muted intro">
+            Paste a URL that can receive requests, for example a free inbox from
+            <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a>. We'll
+            send it a signed test event. If your inbox can be set to answer with an error (500), do
+            that to watch the retries happen, then switch it back.
+          </p>
+          <form id="try-form">
+            <label for="try-url" class="visually-hidden">Your receiver URL</label>
+            <input
+              id="try-url"
+              type="url"
+              required
+              placeholder="https://webhook.site/your-unique-id"
+            />
+            <button id="try-button">Send test event</button>
+          </form>
+          <p id="try-error" class="error small" role="alert"></p>
+          <div id="try-result" class="result hidden" aria-live="polite"></div>
+        </section>
+      </div>
+
+      <section class="panel" aria-labelledby="console-title">
+        <div class="console-head">
+          <div>
+            <h2 id="console-title">Operator console</h2>
+            <p class="muted small" style="margin: 0">
+              Every delivery, its attempts, and replay. Requires the API key.
+            </p>
+          </div>
+          <form id="key-form">
+            <label for="api-key" class="visually-hidden">API key</label>
+            <input id="api-key" type="password" placeholder="API key" autocomplete="off" />
+            <button id="key-button" class="secondary">Unlock</button>
+          </form>
+        </div>
+        <p id="console-error" class="error small" role="alert"></p>
+
+        <div id="console" class="hidden">
+          <div class="stats">
+            <div class="stat pending"><span>Pending</span><b id="stat-pending">–</b></div>
+            <div class="stat delivered"><span>Delivered</span><b id="stat-delivered">–</b></div>
+            <div class="stat dead"><span>Dead</span><b id="stat-dead">–</b></div>
+          </div>
+          <div class="row">
+            <label for="status-filter" class="visually-hidden">Filter by status</label>
+            <select id="status-filter">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="delivered">Delivered</option>
+              <option value="dead">Dead</option>
+            </select>
+            <button id="replay-all" class="secondary">Replay all dead</button>
+            <span id="replay-message" class="muted small" aria-live="polite"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Event</th>
+                  <th>Endpoint</th>
+                  <th>Status</th>
+                  <th>Attempts</th>
+                  <th>Next attempt</th>
+                </tr>
+              </thead>
+              <tbody id="deliveries"></tbody>
+            </table>
+          </div>
+          <div id="details" class="details hidden"></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      function el(tag, props = {}, ...children) {
+        const node = Object.assign(document.createElement(tag), props);
+        node.append(...children.filter((child) => child !== null && child !== undefined));
+        return node;
+      }
+
+      const svgNs = "http://www.w3.org/2000/svg";
+      function svg(tag, attributes = {}, ...children) {
+        const node = document.createElementNS(svgNs, tag);
+        for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+        node.append(...children);
+        return node;
+      }
+
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) $("route").pauseAnimations();
+
+      const time = (iso) => new Date(iso).toLocaleTimeString();
+      const pill = (status) => el("span", { className: `pill ${status}`, textContent: status });
+
+      function attemptList(attempts) {
+        if (attempts.length === 0)
+          return el("p", { className: "muted small", textContent: "No attempts yet." });
+        return el(
+          "ol",
+          { className: "attempts" },
+          ...attempts.map((attempt) => {
+            const succeeded = attempt.statusCode >= 200 && attempt.statusCode < 300;
+            return el(
+              "li",
+              {},
+              el("span", { className: "when", textContent: time(attempt.attemptedAt) }),
+              el("span", {
+                className: `outcome ${succeeded ? "ok" : "fail"}`,
+                textContent: attempt.statusCode ?? attempt.error,
+              }),
+              el("span", { className: "muted", textContent: `${attempt.durationMs} ms` }),
+            );
+          }),
+        );
+      }
+
+      const postmarkWords = {
+        pending: { big: "IN TRANSIT", ring: "WEBHOOK · DELIVERY · SERVICE ·" },
+        delivered: { big: "DELIVERED", ring: "SIGNED · VERIFIED · RECEIVED ·" },
+        dead: { big: "RETURNED", ring: "RETURN · TO · SENDER · REPLAY ·" },
+      };
+
+      function postmark(status, when) {
+        const words = postmarkWords[status];
+        return svg(
+          "svg",
+          {
+            class: `postmark ${status}`,
+            viewBox: "0 0 140 140",
+            role: "img",
+            "aria-label": status,
+          },
+          svg(
+            "defs",
+            {},
+            svg("path", {
+              id: "ring-path",
+              d: "M70 70 m-50 0 a50 50 0 1 1 100 0 a50 50 0 1 1 -100 0",
+            }),
+          ),
+          svg("circle", { class: "ring", cx: 70, cy: 70, r: 64 }),
+          svg("circle", { class: "inner", cx: 70, cy: 70, r: 42 }),
+          svg("text", {}, svg("textPath", { href: "#ring-path", startOffset: "0" }, words.ring)),
+          svg("text", { class: "big", x: 70, y: 70, "text-anchor": "middle" }, words.big),
+          svg("text", { x: 70, y: 88, "text-anchor": "middle" }, when),
+        );
+      }
+
+      let tryPoll;
+      $("try-form").addEventListener("submit", async (submit) => {
+        submit.preventDefault();
+        $("try-error").textContent = "";
+        $("try-button").disabled = true;
+        $("try-button").textContent = "Sending…";
+        clearInterval(tryPoll);
+        try {
+          const response = await fetch("/demo/test-event", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ url: $("try-url").value }),
+          });
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error);
+          showTryResult(body);
+          tryPoll = setInterval(() => refreshTryResult(body), 2000);
+          refreshTryResult(body);
+        } catch (error) {
+          $("try-error").textContent = error.message;
+        } finally {
+          $("try-button").disabled = false;
+          $("try-button").textContent = "Send test event";
+        }
+      });
+
+      function copyButton(text) {
+        const button = el("button", {
+          type: "button",
+          className: "secondary small-button",
+          textContent: "Copy",
+        });
+        button.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            button.textContent = "Copied";
+          } catch {
+            button.textContent = "Select and copy";
+          }
+          setTimeout(() => (button.textContent = "Copy"), 1600);
+        });
+        return button;
+      }
+
+      function showTryResult({ eventId, secret }) {
+        $("try-result").classList.remove("hidden");
+        $("try-result").replaceChildren(
+          el(
+            "div",
+            {},
+            el("p", {}, "Event ", el("code", { textContent: eventId }), " queued."),
+            el(
+              "div",
+              { className: "secret-row small" },
+              "Signing secret:",
+              el("code", { textContent: secret }),
+              copyButton(secret),
+            ),
+            el(
+              "p",
+              { className: "muted small", style: "margin-top: 12px" },
+              "Check it yourself: HMAC-SHA256 of ",
+              el("code", { textContent: "<x-webhook-timestamp>.<raw body>" }),
+              " with this secret should equal the hex in ",
+              el("code", { textContent: "x-webhook-signature" }),
+              ".",
+            ),
+            el(
+              "div",
+              { id: "try-timeline" },
+              el("p", { className: "muted small", textContent: "Waiting for the first attempt…" }),
+            ),
+          ),
+          el("div", { id: "try-stamp" }, postmark("pending", "")),
+        );
+      }
+
+      async function refreshTryResult({ eventId, endpointId }) {
+        const response = await fetch(
+          `/demo/endpoints/${encodeURIComponent(endpointId)}/deliveries`,
+        );
+        if (!response.ok) return;
+        const delivery = (await response.json()).find((item) => item.eventId === eventId);
+        if (!delivery) return;
+        const lastAttempt = delivery.attempts.at(-1);
+        $("try-timeline").replaceChildren(
+          el(
+            "p",
+            { style: "margin: 14px 0 0" },
+            "Status: ",
+            pill(delivery.status),
+            delivery.status === "pending" && delivery.attempts.length > 0
+              ? ` next try at ${time(delivery.nextAttemptAt)}`
+              : null,
+          ),
+          attemptList(delivery.attempts),
+        );
+        $("try-stamp").replaceChildren(
+          postmark(delivery.status, lastAttempt ? time(lastAttempt.attemptedAt) : ""),
+        );
+        if (delivery.status !== "pending") clearInterval(tryPoll);
+      }
+
+      let apiKey = "";
+      try {
+        apiKey = localStorage.getItem("wds-api-key") ?? "";
+      } catch {}
+      let selectedDeliveryId = null;
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        });
+        if (response.status === 401) throw new Error("That API key was not accepted.");
+        if (!response.ok)
+          throw new Error((await response.json()).error ?? `Request failed (${response.status})`);
+        return response.json();
+      }
+
+      $("key-form").addEventListener("submit", async (submit) => {
+        submit.preventDefault();
+        apiKey = $("api-key").value.trim();
+        try {
+          localStorage.setItem("wds-api-key", apiKey);
+        } catch {}
+        $("key-button").disabled = true;
+        await refreshConsole();
+        $("key-button").disabled = false;
+      });
+
+      $("status-filter").addEventListener("change", refreshConsole);
+
+      $("replay-all").addEventListener("click", async () => {
+        $("replay-all").disabled = true;
+        try {
+          const { replayed } = await api("/deliveries/replay", { method: "POST", body: "{}" });
+          $("replay-message").textContent =
+            replayed === 0
+              ? "No dead deliveries to replay."
+              : `${replayed} dead deliveries queued again.`;
+          await refreshConsole();
+        } catch (error) {
+          $("console-error").textContent = error.message;
+        } finally {
+          $("replay-all").disabled = false;
+        }
+      });
+
+      async function refreshConsole() {
+        if (!apiKey) return;
+        try {
+          const status = $("status-filter").value;
+          const [stats, deliveries] = await Promise.all([
+            api("/deliveries/stats"),
+            api(`/deliveries?limit=50${status ? `&status=${status}` : ""}`),
+          ]);
+          $("console-error").textContent = "";
+          $("console").classList.remove("hidden");
+          for (const key of ["pending", "delivered", "dead"])
+            $(`stat-${key}`).textContent = stats[key].toLocaleString();
+          $("deliveries").replaceChildren(
+            ...(deliveries.length > 0
+              ? deliveries.map(deliveryRow)
+              : [
+                  el(
+                    "tr",
+                    {},
+                    el("td", {
+                      className: "empty",
+                      colSpan: 6,
+                      textContent: status
+                        ? `No ${status} deliveries right now.`
+                        : "No deliveries yet. Send a test event above, or publish events with the API.",
+                    }),
+                  ),
+                ]),
+          );
+          if (selectedDeliveryId) showDetails(selectedDeliveryId);
+        } catch (error) {
+          $("console-error").textContent = error.message;
+        }
+      }
+
+      function deliveryRow(delivery) {
+        const row = el(
+          "tr",
+          { tabIndex: 0 },
+          el("td", { className: "id", textContent: delivery.id }),
+          el("td", { textContent: delivery.eventType }),
+          el("td", {
+            className: "url",
+            textContent: delivery.endpointUrl,
+            title: delivery.endpointUrl,
+          }),
+          el("td", {}, pill(delivery.status)),
+          el("td", { className: "num", textContent: delivery.attemptCount }),
+          el("td", {
+            className: "time",
+            textContent: delivery.status === "pending" ? time(delivery.nextAttemptAt) : "—",
+          }),
+        );
+        row.setAttribute("aria-selected", String(delivery.id === selectedDeliveryId));
+        row.addEventListener("click", () => showDetails(delivery.id));
+        row.addEventListener("keydown", (key) => {
+          if (key.key === "Enter" || key.key === " ") {
+            key.preventDefault();
+            showDetails(delivery.id);
+          }
+        });
+        return row;
+      }
+
+      async function showDetails(id) {
+        selectedDeliveryId = id;
+        for (const row of $("deliveries").rows) {
+          row.setAttribute("aria-selected", String(row.cells[0].textContent === String(id)));
+        }
+        try {
+          const delivery = await api(`/deliveries/${id}`);
+          const replay =
+            delivery.status === "dead"
+              ? el("button", { className: "small-button", textContent: "Replay" })
+              : null;
+          replay?.addEventListener("click", async () => {
+            replay.disabled = true;
+            await api(`/deliveries/${id}/replay`, { method: "POST" }).catch((error) => {
+              $("console-error").textContent = error.message;
+            });
+            refreshConsole();
+          });
+          $("details").classList.remove("hidden");
+          $("details").replaceChildren(
+            el(
+              "div",
+              { className: "row" },
+              el("h3", { textContent: `Delivery ${delivery.id}` }),
+              el("div", { className: "row" }, pill(delivery.status), replay),
+            ),
+            el(
+              "p",
+              { className: "small" },
+              "Event ",
+              el("code", { textContent: delivery.eventId }),
+              " → ",
+              el("code", { textContent: delivery.endpointUrl }),
+            ),
+            attemptList(delivery.attempts),
+            el("pre", { textContent: JSON.stringify(delivery.payload, null, 2) }),
+          );
+        } catch (error) {
+          $("console-error").textContent = error.message;
+        }
+      }
+
+      if (apiKey) {
+        $("api-key").value = apiKey;
+        refreshConsole();
+      }
+      setInterval(refreshConsole, 3000);
+    </script>
+  </body>
+</html>

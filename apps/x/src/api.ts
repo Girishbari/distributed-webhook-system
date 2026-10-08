@@ -1,15 +1,12 @@
 import app from "./app";
-import { config, deliveryWorker, pool } from "./container";
+import { config, pool } from "./container";
 
 const server = app.listen(config.port, () => {
-  console.log(`api listening on http://localhost:${config.port}`);
+  console.log(`api only (no deliveries) listening on http://localhost:${config.port}`);
 });
-deliveryWorker.start();
 
 async function shutdown() {
-  console.log("shutting down");
   server.close();
-  await deliveryWorker.stop();
   await pool.end();
   process.exit(0);
 }
